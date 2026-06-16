@@ -77,10 +77,14 @@ function NotificationsPanel({
   open,
   onClose,
   anchorRef,
+  notifications,
+  onMarkAllRead,
 }: {
   open: boolean;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
+  notifications: typeof mockNotifications;
+  onMarkAllRead: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -102,8 +106,8 @@ function NotificationsPanel({
 
   if (!open) return null;
 
-  const unread = mockNotifications.filter((n) => !n.isRead);
-  const allNotifs = mockNotifications;
+  const unread = notifications.filter((n) => !n.isRead);
+  const allNotifs = notifications;
 
   return (
     <div
@@ -125,7 +129,7 @@ function NotificationsPanel({
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button className="text-[11.5px] text-[var(--primary)] hover:underline">
+          <button onClick={onMarkAllRead} className="text-[11.5px] text-[var(--primary)] hover:underline">
             Mark all read
           </button>
           <button onClick={onClose} className="sos-btn sos-btn-ghost p-1 ml-1">
@@ -311,11 +315,12 @@ export function AppHeader() {
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState(mockNotifications);
 
   const notifRef = useRef<HTMLButtonElement>(null);
   const avatarRef = useRef<HTMLButtonElement>(null);
 
-  const unreadCount = mockNotifications.filter((n) => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const toggleNotif = () => {
     setUserMenuOpen(false);
@@ -325,6 +330,10 @@ export function AppHeader() {
   const toggleUserMenu = () => {
     setNotifOpen(false);
     setUserMenuOpen((v) => !v);
+  };
+
+  const markAllRead = () => {
+    setNotifications(notifications.map(n => ({ ...n, isRead: true })));
   };
 
   return (
@@ -402,6 +411,8 @@ export function AppHeader() {
             open={notifOpen}
             onClose={() => setNotifOpen(false)}
             anchorRef={notifRef}
+            notifications={notifications}
+            onMarkAllRead={markAllRead}
           />
         </div>
 
