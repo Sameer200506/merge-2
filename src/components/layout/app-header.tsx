@@ -79,12 +79,16 @@ function NotificationsPanel({
   anchorRef,
   notifications,
   onMarkAllRead,
+  onClearAll,
+  onClearNotif,
 }: {
   open: boolean;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   notifications: typeof mockNotifications;
   onMarkAllRead: () => void;
+  onClearAll: () => void;
+  onClearNotif: (id: string) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -128,11 +132,18 @@ function NotificationsPanel({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={onMarkAllRead} className="text-[11.5px] text-[var(--primary)] hover:underline">
-            Mark all read
-          </button>
-          <button onClick={onClose} className="sos-btn sos-btn-ghost p-1 ml-1">
+        <div className="flex items-center gap-2">
+          {unread.length > 0 && (
+            <button onClick={onMarkAllRead} className="text-[11.5px] text-[var(--primary)] hover:underline">
+              Mark all read
+            </button>
+          )}
+          {allNotifs.length > 0 && (
+            <button onClick={onClearAll} className="text-[11.5px] text-[var(--foreground-muted)] hover:text-[var(--danger)] hover:underline">
+              Clear all
+            </button>
+          )}
+          <button onClick={onClose} className="sos-btn sos-btn-ghost p-1">
             <X size={13} />
           </button>
         </div>
@@ -166,9 +177,21 @@ function NotificationsPanel({
                   <p className="text-[12px] text-[var(--foreground-muted)] mt-0.5 line-clamp-2">{notif.body}</p>
                   <p className="text-[11px] text-[var(--foreground-subtle)] mt-1">{formatRelativeTime(notif.createdAt)}</p>
                 </div>
-                {!notif.isRead && (
-                  <span className="w-2 h-2 rounded-full bg-[var(--primary)] flex-shrink-0 mt-2" />
-                )}
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClearNotif(notif.id);
+                    }}
+                    className="text-[var(--foreground-subtle)] hover:text-[var(--danger)] p-0.5 rounded transition-colors"
+                    aria-label="Remove notification"
+                  >
+                    <X size={13} />
+                  </button>
+                  {!notif.isRead && (
+                    <span className="w-2 h-2 rounded-full bg-[var(--primary)] mt-1" />
+                  )}
+                </div>
               </div>
             );
           })
@@ -336,6 +359,14 @@ export function AppHeader() {
     setNotifications(notifications.map(n => ({ ...n, isRead: true })));
   };
 
+  const clearAll = () => {
+    setNotifications([]);
+  };
+
+  const clearNotif = (id: string) => {
+    setNotifications(notifications.filter(n => n.id !== id));
+  };
+
   return (
     <header
       className={cn(
@@ -413,6 +444,8 @@ export function AppHeader() {
             anchorRef={notifRef}
             notifications={notifications}
             onMarkAllRead={markAllRead}
+            onClearAll={clearAll}
+            onClearNotif={clearNotif}
           />
         </div>
 
