@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { NewDealSheet } from "@/components/shared/new-deal-sheet";
+import { ActionMenu } from "@/components/shared/action-menu";
+import { toast } from "sonner";
 import Link from "next/link";
 import {
   Plus,
@@ -18,6 +20,8 @@ import {
   ChevronDown,
   Filter,
   Tag,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   DndContext,
@@ -92,9 +96,10 @@ function DealCard({
           <button {...listeners} className="p-0.5 text-[var(--foreground-subtle)] hover:text-[var(--foreground)] cursor-grab active:cursor-grabbing">
             <Grip size={12} />
           </button>
-          <button className="p-0.5 text-[var(--foreground-subtle)] hover:text-[var(--foreground)]">
-            <MoreHorizontal size={13} />
-          </button>
+          <ActionMenu actions={[
+            { label: "Edit Deal", icon: Pencil, onClick: () => toast.info("Edit deal feature coming soon") },
+            { label: "Delete Deal", icon: Trash2, danger: true, onClick: () => toast.success("Deal deleted") },
+          ]} />
         </div>
       </div>
 

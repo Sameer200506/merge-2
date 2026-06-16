@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ActionMenu } from "@/components/shared/action-menu";
+import { toast } from "sonner";
 import {
   Search,
   Plus,
@@ -11,6 +13,8 @@ import {
   MoreHorizontal,
   Globe,
   TrendingUp,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { cn, formatCurrency, getInitials } from "@/lib/utils";
 import { mockCustomers } from "@/lib/mock-data";
@@ -94,13 +98,12 @@ function CustomerRow({ customer }: { customer: Customer }) {
       </div>
 
       {/* Actions */}
-      <button
-        className="sos-btn sos-btn-ghost p-1"
-        onClick={(e) => e.preventDefault()}
-        aria-label="More options"
-      >
-        <MoreHorizontal size={14} />
-      </button>
+      <div onClick={(e) => e.preventDefault()}>
+        <ActionMenu actions={[
+          { label: "Edit Customer", icon: Pencil, onClick: () => toast.info("Edit customer feature coming soon") },
+          { label: "Delete Customer", icon: Trash2, danger: true, onClick: () => toast.success("Customer deleted") },
+        ]} />
+      </div>
     </Link>
   );
 }

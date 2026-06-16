@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ActionMenu } from "@/components/shared/action-menu";
+import { toast } from "sonner";
 import {
   Plus,
   Filter,
@@ -15,6 +17,8 @@ import {
   TrendingUp,
   MoreHorizontal,
   ArrowRight,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import { mockProjects, mockCustomers, getUserById } from "@/lib/mock-data";
@@ -44,12 +48,12 @@ function ProjectCard({ project }: { project: (typeof mockProjects)[0] }) {
         <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
           <FolderKanban size={16} className="text-white" />
         </div>
-        <button
-          className="sos-btn sos-btn-ghost p-1"
-          onClick={(e) => e.preventDefault()}
-        >
-          <MoreHorizontal size={14} />
-        </button>
+        <div onClick={(e) => e.preventDefault()}>
+          <ActionMenu actions={[
+            { label: "Edit Project", icon: Pencil, onClick: () => toast.info("Edit project feature coming soon") },
+            { label: "Delete Project", icon: Trash2, danger: true, onClick: () => toast.success("Project deleted") },
+          ]} />
+        </div>
       </div>
 
       {/* Name & Customer */}

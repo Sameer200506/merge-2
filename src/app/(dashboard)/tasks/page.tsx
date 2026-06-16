@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { NewTaskSheet } from "@/components/shared/new-task-sheet";
+import { ActionMenu } from "@/components/shared/action-menu";
+import { toast } from "sonner";
 import {
   Plus,
   Filter,
@@ -21,6 +23,8 @@ import {
   Paperclip,
   MessageSquare,
   ArrowRight,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   DndContext,
@@ -98,9 +102,12 @@ function TaskRow({ task }: { task: Task }) {
           {getInitials(assignee.displayName)}
         </div>
       )}
-      <button className="sos-btn sos-btn-ghost p-1 opacity-0 group-hover:opacity-100">
-        <MoreHorizontal size={13} />
-      </button>
+      <div className="opacity-0 group-hover:opacity-100">
+        <ActionMenu actions={[
+          { label: "Edit Task", icon: Pencil, onClick: () => toast.info("Edit task feature coming soon") },
+          { label: "Delete Task", icon: Trash2, danger: true, onClick: () => toast.success("Task deleted") },
+        ]} />
+      </div>
     </div>
   );
 }
