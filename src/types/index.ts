@@ -91,6 +91,22 @@ export interface Customer extends BaseEntity {
   notes?: string;
 }
 
+// ─── Lead ───────────────────────────────────────────────────
+export type LeadStatus = "new" | "contacted" | "qualified" | "nurturing" | "unqualified";
+export type LeadSource = "web" | "referral" | "cold_outreach" | "linkedin" | "partner" | "other";
+
+export interface Lead extends BaseEntity {
+  name: string; // Company Name
+  contactName: string;
+  email: string;
+  phone?: string;
+  status: LeadStatus;
+  source: LeadSource;
+  value: number;
+  notes?: string;
+}
+
+
 export interface Address {
   street?: string;
   city?: string;

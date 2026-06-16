@@ -15,6 +15,7 @@ import {
   Zap,
   Plus,
   Building2,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui.store";
@@ -27,6 +28,7 @@ const navGroups = [
     label: "Workspace",
     items: [
       { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/leads", icon: Target, label: "Leads" },
       { href: "/activity", icon: Activity, label: "Activity" },
     ],
   },

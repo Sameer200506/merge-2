@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ReportsSheet } from "@/components/shared/reports-sheet";
 import {
   TrendingUp,
   TrendingDown,
@@ -204,6 +206,7 @@ function PipelineStageBar() {
 // ── Main Dashboard ────────────────────────────────────────────
 export default function DashboardPage() {
   const metrics = mockDashboardMetrics;
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -215,7 +218,10 @@ export default function DashboardPage() {
             Welcome back, Alex. Here&apos;s what&apos;s happening today.
           </p>
         </div>
-        <button className="sos-btn sos-btn-primary">
+        <button
+          onClick={() => setReportsOpen(true)}
+          className="sos-btn sos-btn-primary cursor-pointer"
+        >
           <ArrowUpRight size={14} />
           View Reports
         </button>
@@ -358,6 +364,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      <ReportsSheet open={reportsOpen} onClose={() => setReportsOpen(false)} />
     </div>
   );
 }
