@@ -409,9 +409,6 @@ export function AppHeader() {
         >
           <Search size={13} />
           <span>Search...</span>
-          <kbd className="ml-2 text-[11px] font-mono bg-[var(--background)] border border-[var(--border)] px-1 py-0.5 rounded">
-            ⌘K
-          </kbd>
         </button>
 
         {/* Search icon — mobile */}
