@@ -220,7 +220,12 @@ export function NewProjectSheet({ open, onClose }: NewProjectSheetProps) {
                   type="date"
                   value={form.startDate}
                   onChange={(e) => set("startDate", e.target.value)}
-                  className="sos-input"
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch {}
+                  }}
+                  className="sos-input cursor-pointer"
                   style={{ colorScheme: "dark" }}
                 />
               </div>
@@ -232,7 +237,12 @@ export function NewProjectSheet({ open, onClose }: NewProjectSheetProps) {
                   type="date"
                   value={form.endDate}
                   onChange={(e) => set("endDate", e.target.value)}
-                  className="sos-input"
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch {}
+                  }}
+                  className="sos-input cursor-pointer"
                   style={{ colorScheme: "dark" }}
                 />
               </div>
