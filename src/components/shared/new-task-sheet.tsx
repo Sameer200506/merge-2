@@ -251,7 +251,12 @@ export function NewTaskSheet({ open, onClose, defaultStatus = "todo" }: NewTaskS
                   type="date"
                   value={form.dueDate}
                   onChange={(e) => set("dueDate", e.target.value)}
-                  className="sos-input"
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch {}
+                  }}
+                  className="sos-input cursor-pointer"
                   style={{ colorScheme: "dark" }}
                 />
               </div>

@@ -256,7 +256,12 @@ export function NewDealSheet({ open, onClose }: NewDealSheetProps) {
                 type="date"
                 value={form.expectedCloseDate}
                 onChange={(e) => set("expectedCloseDate", e.target.value)}
-                className="sos-input"
+                onClick={(e) => {
+                  try {
+                    e.currentTarget.showPicker();
+                  } catch {}
+                }}
+                className="sos-input cursor-pointer"
                 style={{ colorScheme: "dark" }}
               />
             </div>
