@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "git:sync": "git fetch upstream && git merge upstream/main --allow-unrelated-histories -m \"merge: auto-sync with upstream\" && git push origin main"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
