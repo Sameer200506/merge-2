@@ -32,7 +32,7 @@ export const useUIStore = create<UIState>()(
   persist(
     (set, get) => ({
       sidebarOpen: true,
-      sidebarCollapsed: false,
+      sidebarCollapsed: true,
       commandOpen: false,
       theme: "dark",
       notificationsPanelOpen: false,
