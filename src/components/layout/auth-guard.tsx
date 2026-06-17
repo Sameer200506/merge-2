@@ -28,6 +28,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { activeShifts, tick } = useShiftsStore();
   const [mounted, setMounted] = useState(false);
 
+  console.log("AuthGuard state:", { isAuthenticated, userId: user?.id, pathname, mounted, isLoading });
+
+  if (typeof window !== "undefined") {
+    (window as any).authGuardMounted = true;
+    (window as any).authGuardState = { isAuthenticated, userId: user?.id, pathname, mounted, isLoading };
+  }
+
   const hasActiveShifts = activeShifts.length > 0;
 
   // Global Shift Ticker: fires every second when there are active shifts

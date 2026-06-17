@@ -335,12 +335,20 @@ function UserMenu({
       <div className="py-1 border-t border-[var(--border)]">
         <button
           onClick={() => {
-            if (isClockedIn && user) {
-              clockOut(user.id);
+            console.log("Sign out button clicked!", { isClockedIn, userId: user?.id, email: user?.email });
+            try {
+              if (isClockedIn && user) {
+                console.log("Clocking out user:", user.id);
+                clockOut(user.id);
+              }
+              console.log("Executing logout()...");
+              logout();
+              console.log("Zustand auth store state after logout:", useAuthStore.getState());
+              onClose();
+              toast.info("Signed out successfully.");
+            } catch (error) {
+              console.error("Error during logout process:", error);
             }
-            logout();
-            onClose();
-            toast.info("Signed out successfully.");
           }}
           className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] text-[var(--danger)] hover:bg-[var(--danger-subtle)] transition-colors cursor-pointer"
         >

@@ -27,6 +27,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  console.log("RootLayout server render");
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

@@ -27,6 +27,7 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  console.log("Providers client render");
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

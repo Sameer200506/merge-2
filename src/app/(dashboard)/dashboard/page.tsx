@@ -616,64 +616,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Owner's Staff Work & Leave Summary ── */}
-      {user?.role === "owner" && (
-        <div className="sos-card p-5 animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Staff Work & Leave Summary</h2>
-              <p className="text-[12px] text-[var(--foreground-muted)]">Total accumulated work and leaves taken by employees</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {mockUsers
-              .filter((u) => u.role !== "owner" && u.id !== user?.id)
-              .map((u) => {
-                const totalWorkSeconds = shifts.filter(s => s.userId === u.id).reduce((acc, s) => acc + s.durationSeconds, 0);
-                const hrs = Math.floor(totalWorkSeconds / 3600);
-                const mins = Math.floor((totalWorkSeconds % 3600) / 60);
-                // Mock leaves since there's no leave system: generate from id hash or just 0
-                // We'll give 0 leaves unless they have an ID of 'user_2'
-                const mockLeaves = u.id === 'user_2' ? 2 : u.id === 'user_3' ? 1 : 0;
-                
-                return (
-                  <div key={u.id} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--background-subtle)] flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
-                        {getInitials(u.displayName)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[12.5px] font-semibold text-[var(--foreground)] truncate">{u.displayName}</p>
-                        <p className="text-[11px] text-[var(--foreground-subtle)] capitalize truncate">
-                          {u.role.replace("_", " ")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-[var(--border)]">
-                      <div>
-                        <p className="text-[10px] text-[var(--foreground-muted)] uppercase tracking-wider font-semibold mb-0.5">Total Work</p>
-                        <p className="text-[13px] font-mono font-medium text-[var(--foreground)]">{hrs}h {mins}m</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-[var(--foreground-muted)] uppercase tracking-wider font-semibold mb-0.5">Leaves Taken</p>
-                        <p className="text-[13px] font-medium text-[var(--foreground)]">{mockLeaves} days</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Live Team Shift Status ── */}
+      {/* ── Team Shift & Work Summary Table ── */}
       <div className="sos-card p-5 animate-fade-in">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Live Team Shift Status</h2>
-            <p className="text-[12px] text-[var(--foreground-muted)]">Real-time shift clock status for all employees</p>
+            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Team Shift & Attendance</h2>
+            <p className="text-[12px] text-[var(--foreground-muted)]">
+              {user?.role === "owner" 
+                ? "Real-time shift status, accumulated work hours, and leaves summary."
+                : "Real-time shift status and current activity for all team members."}
+            </p>
           </div>
-          <span className="text-[11.5px] font-medium bg-emerald-500/10 text-emerald-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+          <span className="self-start sm:self-center text-[11.5px] font-medium bg-emerald-500/10 text-emerald-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
@@ -682,68 +636,107 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {mockUsers
-            .filter((u) => u.role !== "owner" && u.id !== user?.id) // Show everyone except owners and the current user
-            .map((u) => {
-              const activeShift = activeShifts.find((s) => s.userId === u.id);
-              const isWorking = !!activeShift;
-              const lastShift = shifts.find((s) => s.userId === u.id && s.isCompleted);
+        <div className="overflow-x-auto -mx-5 px-5">
+          <table className="w-full text-left border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-[var(--border)] text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
+                <th className="pb-3 pr-4 font-semibold">Employee</th>
+                <th className="pb-3 px-4 font-semibold">Status</th>
+                <th className="pb-3 px-4 font-semibold">Current / Last Shift</th>
+                {user?.role === "owner" && (
+                  <>
+                    <th className="pb-3 px-4 font-semibold text-right">Total Work</th>
+                    <th className="pb-3 pl-4 font-semibold text-right">Leaves Taken</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {mockUsers
+                .filter((u) => u.role !== "owner" && u.id !== user?.id)
+                .map((u) => {
+                  const activeShift = activeShifts.find((s) => s.userId === u.id);
+                  const isWorking = !!activeShift;
+                  const lastShift = shifts.find((s) => s.userId === u.id && s.isCompleted);
+                  
+                  const totalWorkSeconds = shifts
+                    .filter((s) => s.userId === u.id)
+                    .reduce((acc, s) => acc + s.durationSeconds, 0);
+                  const hrs = Math.floor(totalWorkSeconds / 3600);
+                  const mins = Math.floor((totalWorkSeconds % 3600) / 60);
+                  const mockLeaves = u.id === "user_2" ? 2 : u.id === "user_3" ? 1 : 0;
 
-              return (
-                <div
-                  key={u.id}
-                  className={cn(
-                    "p-4 rounded-xl border transition-all flex flex-col justify-between min-h-[120px]",
-                    isWorking
-                      ? "bg-emerald-500/[0.02] border-emerald-500/20 shadow-md shadow-emerald-500/[0.02]"
-                      : "bg-[var(--card)] border-[var(--border)]"
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
-                      {getInitials(u.displayName)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[12.5px] font-semibold text-[var(--foreground)] truncate">{u.displayName}</p>
-                      <p className="text-[11px] text-[var(--foreground-subtle)] capitalize truncate">
-                        {u.role.replace("_", " ")}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
-                    {isWorking ? (
-                      <>
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Active
-                        </span>
-                        <span className="font-mono text-[12px] font-bold text-[var(--foreground)]">
-                          {formatDuration(activeShift.durationSeconds)}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                          Off Shift
-                        </span>
-                        <span className="text-[10.5px] text-[var(--foreground-subtle)] truncate max-w-[100px]" title={
-                          lastShift
-                            ? `Last: ${formatDuration(lastShift.durationSeconds)} on ${new Date(lastShift.startTime).toLocaleDateString()}`
-                            : "No shifts"
-                        }>
-                          {lastShift
-                            ? `Last: ${formatDuration(lastShift.durationSeconds)}`
-                            : "No shifts"}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  return (
+                    <tr 
+                      key={u.id} 
+                      className={cn(
+                        "hover:bg-[var(--background-muted)]/40 transition-colors",
+                        isWorking && "bg-emerald-500/[0.01]"
+                      )}
+                    >
+                      <td className="py-3.5 pr-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                            {getInitials(u.displayName)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-[var(--foreground)] truncate">{u.displayName}</p>
+                            <p className="text-[11px] text-[var(--foreground-subtle)] capitalize truncate">
+                              {u.role.replace("_", " ")}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {isWorking ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-400/10 text-slate-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            Off Shift
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {isWorking ? (
+                          <div className="flex flex-col">
+                            <span className="font-mono font-bold text-[var(--foreground)]">
+                              {formatDuration(activeShift.durationSeconds)}
+                            </span>
+                            <span className="text-[10px] text-[var(--foreground-subtle)]">
+                              Started at {new Date(activeShift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-[var(--foreground-muted)]">
+                            {lastShift ? (
+                              <span title={`Completed on ${new Date(lastShift.startTime).toLocaleDateString()}`}>
+                                Last: <span className="font-mono">{formatDuration(lastShift.durationSeconds)}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[var(--foreground-subtle)]">No shifts logged</span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      {user?.role === "owner" && (
+                        <>
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap font-mono font-medium text-[var(--foreground)]">
+                            {hrs}h {mins}m
+                          </td>
+                          <td className="py-3.5 pl-4 text-right whitespace-nowrap font-medium text-[var(--foreground)]">
+                            {mockLeaves} {mockLeaves === 1 ? "day" : "days"}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
         </div>
       </div>
 
