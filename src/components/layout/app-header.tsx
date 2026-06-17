@@ -20,13 +20,17 @@ import {
   CheckCircle2,
   TrendingUp,
   FolderKanban,
+  Play,
+  Square,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
+import { useShiftsStore } from "@/stores/shifts.store";
 import { mockNotifications } from "@/lib/mock-data";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
+import { toast } from "sonner";
 
 // ── Breadcrumb ────────────────────────────────────────────────
 const breadcrumbMap: Record<string, string> = {
@@ -229,8 +233,10 @@ function UserMenu({
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
 }) {
-  const { user, organization } = useAuthStore();
+  const { user, organization, logout } = useAuthStore();
   const { theme, toggleTheme } = useUIStore();
+  const { activeShifts, clockOut } = useShiftsStore();
+  const isClockedIn = user ? activeShifts.some((s) => s.userId === user.id) : false;
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -326,8 +332,15 @@ function UserMenu({
       {/* Sign out */}
       <div className="py-1 border-t border-[var(--border)]">
         <button
-          onClick={onClose}
-          className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] text-[var(--danger)] hover:bg-[var(--danger-subtle)] transition-colors"
+          onClick={() => {
+            if (isClockedIn && user) {
+              clockOut(user.id);
+            }
+            logout();
+            onClose();
+            toast.info("Signed out successfully.");
+          }}
+          className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] text-[var(--danger)] hover:bg-[var(--danger-subtle)] transition-colors cursor-pointer"
         >
           <LogOut size={14} />
           Sign out
@@ -337,11 +350,25 @@ function UserMenu({
   );
 }
 
+function formatDuration(totalSeconds: number) {
+  const hrs = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return [
+    hrs.toString().padStart(2, "0"),
+    mins.toString().padStart(2, "0"),
+    secs.toString().padStart(2, "0")
+  ].join(":");
+}
+
 // ── App Header ────────────────────────────────────────────────
 export function AppHeader() {
   const { setCommandOpen, toggleSidebar } = useUIStore();
   const { theme } = useUIStore();
   const { user } = useAuthStore();
+  const { activeShifts, clockIn, clockOut } = useShiftsStore();
+  const activeShift = user ? activeShifts.find((s) => s.userId === user.id) : null;
+  const isClockedIn = !!activeShift;
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -413,6 +440,52 @@ export function AppHeader() {
         >
           <Search size={16} />
         </button>
+
+        {/* Shift Timer */}
+        {user && (
+          <div className="flex items-center gap-2 bg-[var(--background-muted)] border border-[var(--border)] rounded-lg p-1 px-2.5 h-8">
+            {isClockedIn ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="font-mono text-[12.5px] font-semibold text-[var(--foreground)] w-16 text-center">
+                  {activeShift ? formatDuration(activeShift.durationSeconds) : "00:00:00"}
+                </span>
+                <button
+                  onClick={() => {
+                    clockOut(user.id);
+                    toast.success("Clocked out of shift successfully.");
+                  }}
+                  className="sos-btn sos-btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md cursor-pointer flex items-center justify-center"
+                  title="Clock Out"
+                  aria-label="Clock Out"
+                >
+                  <Square size={11} fill="currentColor" />
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <span className="text-[12px] font-medium text-[var(--foreground-muted)]">
+                  Off Shift
+                </span>
+                <button
+                  onClick={() => {
+                    clockIn(user.id);
+                    toast.success("Clocked in to shift successfully!");
+                  }}
+                  className="sos-btn sos-btn-ghost p-1 text-[#6366f1] hover:bg-[#6366f1]/10 rounded-md cursor-pointer flex items-center justify-center"
+                  title="Clock In"
+                  aria-label="Clock In"
+                >
+                  <Play size={11} fill="currentColor" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Notifications */}
         <div className="relative">

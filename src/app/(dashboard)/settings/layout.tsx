@@ -14,6 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth.store";
 
 const settingsNav = [
   { href: "/settings/profile", icon: User, label: "Profile" },
@@ -22,8 +23,18 @@ const settingsNav = [
   { href: "/settings/billing", icon: CreditCard, label: "Billing" },
 ];
 
+const RESTRICTED_ROUTES: Record<string, string[]> = {
+  sales_manager: ["/settings/billing"],
+  project_manager: ["/settings/billing"],
+  team_member: ["/settings/organization", "/settings/members", "/settings/billing"],
+};
+
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user } = useAuthStore();
+
+  const roleRestrictions = RESTRICTED_ROUTES[user?.role || ""] || [];
+  const visibleNav = settingsNav.filter((item) => !roleRestrictions.includes(item.href));
 
   return (
     <div className="animate-fade-in">
@@ -40,7 +51,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         {/* Sidebar nav */}
         <div className="lg:col-span-1">
           <nav className="sos-card p-2 space-y-0.5">
-            {settingsNav.map((item) => (
+            {visibleNav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

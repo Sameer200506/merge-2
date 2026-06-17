@@ -390,3 +390,13 @@ export interface RevenueDataPoint {
   forecast: number;
   actual: number;
 }
+
+// ─── Shift Timing ─────────────────────────────────────────────
+export interface Shift {
+  id: string;
+  userId: string;
+  startTime: string; // ISO string
+  endTime?: string;  // ISO string
+  durationSeconds: number;
+  isCompleted: boolean;
+}

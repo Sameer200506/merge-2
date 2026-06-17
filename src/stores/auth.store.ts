@@ -35,15 +35,19 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      user: mockUsers[0], // Pre-authenticated with mock user for demo
-      organization: MOCK_ORG,
-      isAuthenticated: true,
+      user: null,
+      organization: null,
+      isAuthenticated: false,
       isLoading: false,
 
       login: async (email: string, _password: string) => {
         set({ isLoading: true });
         await new Promise((resolve) => setTimeout(resolve, 800));
-        const found = mockUsers.find((u) => u.email === email) || mockUsers[0];
+        const found = mockUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+        if (!found) {
+          set({ isLoading: false });
+          throw new Error("Invalid email. Please use a mock employee email.");
+        }
         set({ user: found, organization: MOCK_ORG, isAuthenticated: true, isLoading: false });
       },
 

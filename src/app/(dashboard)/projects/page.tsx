@@ -24,6 +24,7 @@ import { cn, formatDate, getInitials } from "@/lib/utils";
 import { mockProjects, mockCustomers, getUserById, mockUsers } from "@/lib/mock-data";
 import type { ProjectStatus } from "@/types";
 import { NewProjectSheet } from "@/components/shared/new-project-sheet";
+import { useAuthStore } from "@/stores/auth.store";
 
 const statusConfig: Record<ProjectStatus, { label: string; className: string }> = {
   planning: { label: "Planning", className: "status-planning" },
@@ -128,12 +129,18 @@ function ProjectCard({ project }: { project: (typeof mockProjects)[0] }) {
 }
 
 export default function ProjectsPage() {
+  const { user } = useAuthStore();
   const [filter, setFilter] = useState<"all" | ProjectStatus>("all");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [filterOpen, setFilterOpen] = useState(false);
-  const statsBase = mockProjects.filter((p) => {
+
+  const baseProjects = user?.role === "team_member"
+    ? mockProjects.filter((p) => p.teamIds.includes(user.id))
+    : mockProjects;
+
+  const statsBase = baseProjects.filter((p) => {
     const matchPriority = priorityFilter === "all" || p.priority === priorityFilter;
     const matchOwner = ownerFilter === "all" || p.ownerId === ownerFilter;
     return matchPriority && matchOwner;
@@ -170,12 +177,14 @@ export default function ProjectsPage() {
           >
             <Filter size={12} /> Filter
           </button>
-          <button
-            onClick={() => setNewProjectOpen(true)}
-            className="sos-btn sos-btn-primary"
-          >
-            <Plus size={13} /> New Project
-          </button>
+          {user?.role !== "team_member" && (
+            <button
+              onClick={() => setNewProjectOpen(true)}
+              className="sos-btn sos-btn-primary"
+            >
+              <Plus size={13} /> New Project
+            </button>
+          )}
         </div>
       </div>
 
@@ -197,19 +206,21 @@ export default function ProjectsPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-medium text-[var(--foreground-muted)]">Project PM:</span>
-            <select
-              value={ownerFilter}
-              onChange={(e) => setOwnerFilter(e.target.value)}
-              className="sos-input py-1 px-2.5 text-[12.5px] rounded-lg bg-[var(--background)] border border-[var(--border)] cursor-pointer"
-            >
-              <option value="all">All Managers</option>
-              {mockUsers.map((u) => (
-                <option key={u.id} value={u.id}>{u.displayName}</option>
-              ))}
-            </select>
-          </div>
+          {user?.role !== "team_member" && (
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium text-[var(--foreground-muted)]">Project PM:</span>
+              <select
+                value={ownerFilter}
+                onChange={(e) => setOwnerFilter(e.target.value)}
+                className="sos-input py-1 px-2.5 text-[12.5px] rounded-lg bg-[var(--background)] border border-[var(--border)] cursor-pointer"
+              >
+                <option value="all">All Managers</option>
+                {mockUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.displayName}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {(priorityFilter !== "all" || ownerFilter !== "all") && (
             <button
@@ -261,19 +272,22 @@ export default function ProjectsPage() {
           <ProjectCard key={project.id} project={project} />
         ))}
         {/* New project CTA */}
+        {user?.role !== "team_member" && (
           <button
             onClick={() => setNewProjectOpen(true)}
             className={cn(
-            "sos-card p-5 border-2 border-dashed flex flex-col items-center justify-center gap-2",
-            "text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:border-[var(--border-strong)]",
-            "transition-all cursor-pointer min-h-[200px]"
-          )}>
+              "sos-card p-5 border-2 border-dashed flex flex-col items-center justify-center gap-2",
+              "text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:border-[var(--border-strong)]",
+              "transition-all cursor-pointer min-h-[200px]"
+            )}
+          >
             <div className="w-9 h-9 rounded-lg border-2 border-dashed border-[var(--border-strong)] flex items-center justify-center">
               <Plus size={16} />
             </div>
             <p className="text-[13px] font-medium">New Project</p>
             <p className="text-[11.5px] text-[var(--foreground-subtle)]">Start from scratch or template</p>
           </button>
+        )}
       </div>
 
       <NewProjectSheet open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />

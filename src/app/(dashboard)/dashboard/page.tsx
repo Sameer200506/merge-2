@@ -13,6 +13,11 @@ import {
   Target,
   Activity,
   ArrowUpRight,
+  Play,
+  Square,
+  Check,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import {
   BarChart,
@@ -22,8 +27,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  AreaChart,
-  Area,
   Legend,
 } from "recharts";
 import { cn, formatCurrency, formatRelativeTime, getInitials } from "@/lib/utils";
@@ -32,7 +35,23 @@ import {
   mockActivities,
   mockUsers,
   getUserById,
+  mockTasks,
 } from "@/lib/mock-data";
+import { useAuthStore } from "@/stores/auth.store";
+import { useShiftsStore } from "@/stores/shifts.store";
+import { toast } from "sonner";
+
+// ── Duration Formatter Helper ─────────────────────────────────
+function formatDuration(totalSeconds: number) {
+  const hrs = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return [
+    hrs.toString().padStart(2, "0"),
+    mins.toString().padStart(2, "0"),
+    secs.toString().padStart(2, "0")
+  ].join(":");
+}
 
 // ── KPI Card ─────────────────────────────────────────────────
 interface KPICardProps {
@@ -204,10 +223,32 @@ function PipelineStageBar() {
   );
 }
 
-// ── Main Dashboard ────────────────────────────────────────────
-export default function DashboardPage() {
-  const metrics = mockDashboardMetrics;
-  const [reportsOpen, setReportsOpen] = useState(false);
+// ── Employee Dashboard View (For team_member role) ─────────────
+function EmployeeDashboardView({ user }: { user: any }) {
+  const { activeShifts, shifts, clockIn, clockOut } = useShiftsStore();
+  const activeShift = activeShifts.find((s) => s.userId === user.id);
+  const isClockedIn = !!activeShift;
+
+  const [myTasks, setMyTasks] = useState(() =>
+    mockTasks.filter((t) => t.assigneeId === user.id)
+  );
+
+  const toggleTask = (taskId: string) => {
+    setMyTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const newStatus = t.status === "done" ? "todo" : "done";
+          toast.success(newStatus === "done" ? "Task marked as completed!" : "Task marked as incomplete");
+          return { ...t, status: newStatus };
+        }
+        return t;
+      })
+    );
+  };
+
+  const myCompletedShifts = shifts.filter(
+    (s) => s.userId === user.id && s.isCompleted
+  );
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -216,7 +257,216 @@ export default function DashboardPage() {
         <div>
           <h1 className="page-title">Dashboard</h1>
           <p className="text-[13px] text-[var(--foreground-muted)] mt-0.5">
-            Welcome back, Alex. Here&apos;s what&apos;s happening today.
+            Welcome back, {user.displayName}. Here&apos;s your shift and task summary.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Shift Controller */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="sos-card p-6 flex flex-col justify-between h-full relative overflow-hidden">
+            {/* Decorative background gradient */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[14.5px] font-semibold text-[var(--foreground)]">Shift Timer</h2>
+                {isClockedIn ? (
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    On Shift
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-medium text-slate-400 bg-slate-400/10 px-2.5 py-0.5 rounded-full">
+                    Off Shift
+                  </span>
+                )}
+              </div>
+
+              {/* Ticking time display */}
+              <div className="text-center py-6">
+                <span className="font-mono text-[42px] font-bold tracking-tight text-[var(--foreground)] leading-none">
+                  {activeShift ? formatDuration(activeShift.durationSeconds) : "00:00:00"}
+                </span>
+                <p className="text-[12px] text-[var(--foreground-muted)] mt-2">
+                  {isClockedIn
+                    ? `Started at ${new Date(activeShift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : "Ready to log hours"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              {isClockedIn ? (
+                <button
+                  onClick={() => {
+                    clockOut(user.id);
+                    toast.success("Clocked out of shift successfully.");
+                  }}
+                  className="w-full py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium text-[13.5px] transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Square size={14} fill="currentColor" />
+                  Clock Out
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    clockIn(user.id);
+                    toast.success("Clocked in to shift successfully!");
+                  }}
+                  className="w-full py-3 rounded-xl gradient-primary hover:opacity-90 text-white font-medium text-[13.5px] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10"
+                >
+                  <Play size={14} fill="currentColor" />
+                  Clock In
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Shift History */}
+          <div className="sos-card p-5">
+            <h3 className="text-[13.5px] font-semibold text-[var(--foreground)] mb-3 flex items-center gap-1.5">
+              <Clock size={14} className="text-[var(--foreground-subtle)]" />
+              Shift History
+            </h3>
+            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+              {myCompletedShifts.length === 0 ? (
+                <p className="text-[12px] text-[var(--foreground-subtle)] py-4 text-center">
+                  No completed shifts in history
+                </p>
+              ) : (
+                myCompletedShifts.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between py-2 border-b border-[var(--border)] last:border-0"
+                  >
+                    <div>
+                      <p className="text-[12px] font-medium text-[var(--foreground)]">
+                        {new Date(s.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                      </p>
+                      <p className="text-[11px] text-[var(--foreground-subtle)]">
+                        {new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{" "}
+                        {s.endTime ? new Date(s.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                      </p>
+                    </div>
+                    <span className="font-mono text-[12px] font-semibold text-[var(--foreground-muted)]">
+                      {formatDuration(s.durationSeconds)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Columns: Assigned Tasks */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="sos-card p-6 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4 border-b border-[var(--border)] pb-3">
+              <div>
+                <h2 className="text-[14.5px] font-semibold text-[var(--foreground)]">My Assigned Tasks</h2>
+                <p className="text-[12px] text-[var(--foreground-muted)]">Check off completed items</p>
+              </div>
+              <span className="text-[11.5px] font-medium px-2 py-0.5 rounded-full bg-[var(--primary-subtle)] text-[var(--primary)]">
+                {myTasks.filter((t) => t.status !== "done").length} Open
+              </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[460px] pr-2">
+              {myTasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <CheckCircle2 size={32} className="text-[var(--foreground-subtle)] opacity-40 mb-2" />
+                  <p className="text-[13px] font-medium text-[var(--foreground-muted)]">All caught up!</p>
+                  <p className="text-[12px] text-[var(--foreground-subtle)]">No tasks assigned to you.</p>
+                </div>
+              ) : (
+                myTasks.map((task) => {
+                  const isCompleted = task.status === "done";
+                  return (
+                    <div
+                      key={task.id}
+                      onClick={() => toggleTask(task.id)}
+                      className={cn(
+                        "flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer select-none",
+                        isCompleted
+                          ? "bg-[var(--background-muted)]/40 border-[var(--border)] opacity-60"
+                          : "bg-[var(--card)] border-[var(--border)] hover:border-[var(--border-strong)]"
+                      )}
+                    >
+                      <button
+                        className={cn(
+                          "w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
+                          isCompleted
+                            ? "bg-[var(--primary)] border-[var(--primary)] text-white"
+                            : "border-[var(--border-strong)] hover:border-[var(--primary)]"
+                        )}
+                      >
+                        {isCompleted && <Check size={10} strokeWidth={3} />}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={cn(
+                            "text-[13px] font-medium text-[var(--foreground)] transition-all",
+                            isCompleted && "line-through text-[var(--foreground-muted)]"
+                          )}
+                        >
+                          {task.title}
+                        </p>
+                        {task.dueDate && (
+                          <span className="text-[11px] text-[var(--foreground-subtle)] mt-1 inline-flex items-center gap-1">
+                            <Clock size={10} />
+                            Due {new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={cn(
+                          "text-[10.5px] font-medium px-2 py-0.5 rounded capitalize flex-shrink-0",
+                          task.priority === "urgent" || task.priority === "high"
+                            ? "bg-[var(--danger-subtle)] text-[var(--danger-foreground)]"
+                            : task.priority === "medium"
+                            ? "bg-[var(--warning-subtle)] text-[var(--warning-foreground)]"
+                            : "bg-[var(--background-muted)] text-[var(--foreground-muted)]"
+                        )}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Owner/Manager Dashboard View ──────────────────────────────
+export default function DashboardPage() {
+  const metrics = mockDashboardMetrics;
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const { user } = useAuthStore();
+  const { activeShifts, shifts } = useShiftsStore();
+
+  // If employee is logged in, show employee-specific dashboard
+  if (user?.role === "team_member") {
+    return <EmployeeDashboardView user={user} />;
+  }
+
+  return (
+    <div className="animate-fade-in space-y-6">
+      {/* Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="text-[13px] text-[var(--foreground-muted)] mt-0.5">
+            Welcome back, {user?.displayName ?? "Alex"}. Here&apos;s what&apos;s happening today.
           </p>
         </div>
         <button
@@ -365,6 +615,88 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Live Team Shift Status ── */}
+      <div className="sos-card p-5 animate-fade-in">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Live Team Shift Status</h2>
+            <p className="text-[12px] text-[var(--foreground-muted)]">Real-time shift clock status for all employees</p>
+          </div>
+          <span className="text-[11.5px] font-medium bg-emerald-500/10 text-emerald-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            </span>
+            {activeShifts.length} Working Now
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {mockUsers
+            .filter((u) => u.id !== user?.id) // Show everyone except the current user
+            .map((u) => {
+              const activeShift = activeShifts.find((s) => s.userId === u.id);
+              const isWorking = !!activeShift;
+              const lastShift = shifts.find((s) => s.userId === u.id && s.isCompleted);
+
+              return (
+                <div
+                  key={u.id}
+                  className={cn(
+                    "p-4 rounded-xl border transition-all flex flex-col justify-between min-h-[120px]",
+                    isWorking
+                      ? "bg-emerald-500/[0.02] border-emerald-500/20 shadow-md shadow-emerald-500/[0.02]"
+                      : "bg-[var(--card)] border-[var(--border)]"
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                      {getInitials(u.displayName)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12.5px] font-semibold text-[var(--foreground)] truncate">{u.displayName}</p>
+                      <p className="text-[11px] text-[var(--foreground-subtle)] capitalize truncate">
+                        {u.role.replace("_", " ")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
+                    {isWorking ? (
+                      <>
+                        <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Active
+                        </span>
+                        <span className="font-mono text-[12px] font-bold text-[var(--foreground)]">
+                          {formatDuration(activeShift.durationSeconds)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Off Shift
+                        </span>
+                        <span className="text-[10.5px] text-[var(--foreground-subtle)] truncate max-w-[100px]" title={
+                          lastShift
+                            ? `Last: ${formatDuration(lastShift.durationSeconds)} on ${new Date(lastShift.startTime).toLocaleDateString()}`
+                            : "No shifts"
+                        }>
+                          {lastShift
+                            ? `Last: ${formatDuration(lastShift.durationSeconds)}`
+                            : "No shifts"}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      </div>
+
       <ReportsSheet open={reportsOpen} onClose={() => setReportsOpen(false)} />
     </div>
   );

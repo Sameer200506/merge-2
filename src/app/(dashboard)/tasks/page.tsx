@@ -45,6 +45,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import { mockTasks, getUserById, mockProjects, mockUsers } from "@/lib/mock-data";
 import type { Task, TaskStatus, TaskPriority } from "@/types";
+import { useAuthStore } from "@/stores/auth.store";
 
 const statusConfig: Record<TaskStatus, { label: string; icon: React.ElementType; color: string }> = {
   backlog: { label: "Backlog", icon: Circle, color: "#94a3b8" },
@@ -169,10 +170,12 @@ function KanbanColumn({
   status,
   tasks,
   onAddTask,
+  showAddTask = true,
 }: {
   status: TaskStatus;
   tasks: Task[];
   onAddTask: (status: TaskStatus) => void;
+  showAddTask?: boolean;
 }) {
   const cfg = statusConfig[status];
   return (
@@ -185,12 +188,14 @@ function KanbanColumn({
             {tasks.length}
           </span>
         </div>
-        <button
-          onClick={() => onAddTask(status)}
-          className="sos-btn sos-btn-ghost p-1"
-        >
-          <Plus size={13} />
-        </button>
+        {showAddTask && (
+          <button
+            onClick={() => onAddTask(status)}
+            className="sos-btn sos-btn-ghost p-1"
+          >
+            <Plus size={13} />
+          </button>
+        )}
       </div>
       <div className="flex-1 px-2 pb-2 overflow-y-auto">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -208,6 +213,7 @@ function KanbanColumn({
 
 // ── Main Tasks Page ───────────────────────────────────────────
 export default function TasksPage() {
+  const { user } = useAuthStore();
   const [view, setView] = useState<"list" | "kanban">("list");
   const [tasks, setTasks] = useState(mockTasks);
   const [search, setSearch] = useState("");
@@ -227,6 +233,9 @@ export default function TasksPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const filtered = tasks.filter((t) => {
+    if (user?.role === "team_member" && t.assigneeId !== user?.id) {
+      return false;
+    }
     const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
     const matchPriority = priorityFilter === "all" || t.priority === priorityFilter;
     const matchType = typeFilter === "all" || t.type === typeFilter;
@@ -285,12 +294,14 @@ export default function TasksPage() {
           >
             <Filter size={12} /> Filter
           </button>
-          <button
-            onClick={() => openNewTask("todo")}
-            className="sos-btn sos-btn-primary"
-          >
-            <Plus size={13} /> New Task
-          </button>
+          {user?.role !== "team_member" && (
+            <button
+              onClick={() => openNewTask("todo")}
+              className="sos-btn sos-btn-primary"
+            >
+              <Plus size={13} /> New Task
+            </button>
+          )}
         </div>
       </div>
 
@@ -327,20 +338,22 @@ export default function TasksPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-medium text-[var(--foreground-muted)]">Assignee:</span>
-            <select
-              value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              className="sos-input py-1 px-2.5 text-[12.5px] rounded-lg bg-[var(--background)] border border-[var(--border)] cursor-pointer"
-            >
-              <option value="all">All Assignees</option>
-              <option value="unassigned">Unassigned</option>
-              {mockUsers.map((u) => (
-                <option key={u.id} value={u.id}>{u.displayName}</option>
-              ))}
-            </select>
-          </div>
+          {user?.role !== "team_member" && (
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium text-[var(--foreground-muted)]">Assignee:</span>
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="sos-input py-1 px-2.5 text-[12.5px] rounded-lg bg-[var(--background)] border border-[var(--border)] cursor-pointer"
+              >
+                <option value="all">All Assignees</option>
+                <option value="unassigned">Unassigned</option>
+                {mockUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.displayName}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {(priorityFilter !== "all" || typeFilter !== "all" || assigneeFilter !== "all") && (
             <button
@@ -414,6 +427,7 @@ export default function TasksPage() {
                 status={status}
                 tasks={groupByStatus(status)}
                 onAddTask={openNewTask}
+                showAddTask={user?.role !== "team_member"}
               />
             ))}
           </div>
