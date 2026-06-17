@@ -185,8 +185,8 @@ function CustomTooltip({ active, payload, label }: {
   );
 }
 
-// ── Pipeline Stage Bar ────────────────────────────────────────
-function PipelineStageBar() {
+// ── Workflow Stage Bar ────────────────────────────────────────
+function WorkflowStageBar() {
   const stages = [
     { name: "Lead", count: 2, color: "#6366f1" },
     { name: "Qualified", count: 1, color: "#8b5cf6" },
@@ -481,9 +481,9 @@ export default function DashboardPage() {
       {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Pipeline Value"
-          value={formatCurrency(metrics.pipelineValue)}
-          change={metrics.pipelineChange}
+          title="Workflow Value"
+          value={formatCurrency(metrics.workflowValue)}
+          change={metrics.workflowChange}
           changeLabel="vs last month"
           icon={DollarSign}
           iconColor="text-[var(--primary)]"
@@ -557,22 +557,22 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* Pipeline breakdown */}
+        {/* Workflow breakdown */}
         <div className="sos-card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Pipeline</h2>
+              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Workflow</h2>
               <p className="text-[12px] text-[var(--foreground-muted)]">By stage</p>
             </div>
             <TrendingUp size={15} className="text-[var(--primary)]" />
           </div>
           <div className="mb-4">
             <p className="text-[26px] font-bold text-[var(--foreground)] tracking-tight">
-              {formatCurrency(metrics.pipelineValue)}
+              {formatCurrency(metrics.workflowValue)}
             </p>
-            <p className="text-[12px] text-[var(--foreground-muted)]">Total pipeline value</p>
+            <p className="text-[12px] text-[var(--foreground-muted)]">Total workflow value</p>
           </div>
-          <PipelineStageBar />
+          <WorkflowStageBar />
         </div>
       </div>
 
@@ -616,6 +616,56 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Owner's Staff Work & Leave Summary ── */}
+      {user?.role === "owner" && (
+        <div className="sos-card p-5 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Staff Work & Leave Summary</h2>
+              <p className="text-[12px] text-[var(--foreground-muted)]">Total accumulated work and leaves taken by employees</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {mockUsers
+              .filter((u) => u.role !== "owner" && u.id !== user?.id)
+              .map((u) => {
+                const totalWorkSeconds = shifts.filter(s => s.userId === u.id).reduce((acc, s) => acc + s.durationSeconds, 0);
+                const hrs = Math.floor(totalWorkSeconds / 3600);
+                const mins = Math.floor((totalWorkSeconds % 3600) / 60);
+                // Mock leaves since there's no leave system: generate from id hash or just 0
+                // We'll give 0 leaves unless they have an ID of 'user_2'
+                const mockLeaves = u.id === 'user_2' ? 2 : u.id === 'user_3' ? 1 : 0;
+                
+                return (
+                  <div key={u.id} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--background-subtle)] flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                        {getInitials(u.displayName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[12.5px] font-semibold text-[var(--foreground)] truncate">{u.displayName}</p>
+                        <p className="text-[11px] text-[var(--foreground-subtle)] capitalize truncate">
+                          {u.role.replace("_", " ")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-[var(--border)]">
+                      <div>
+                        <p className="text-[10px] text-[var(--foreground-muted)] uppercase tracking-wider font-semibold mb-0.5">Total Work</p>
+                        <p className="text-[13px] font-mono font-medium text-[var(--foreground)]">{hrs}h {mins}m</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-[var(--foreground-muted)] uppercase tracking-wider font-semibold mb-0.5">Leaves Taken</p>
+                        <p className="text-[13px] font-medium text-[var(--foreground)]">{mockLeaves} days</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Live Team Shift Status ── */}
       <div className="sos-card p-5 animate-fade-in">
         <div className="flex items-center justify-between mb-4">
@@ -628,13 +678,13 @@ export default function DashboardPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
             </span>
-            {activeShifts.length} Working Now
+            {activeShifts.filter(s => mockUsers.find(u => u.id === s.userId)?.role !== "owner").length} Working Now
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {mockUsers
-            .filter((u) => u.id !== user?.id) // Show everyone except the current user
+            .filter((u) => u.role !== "owner" && u.id !== user?.id) // Show everyone except owners and the current user
             .map((u) => {
               const activeShift = activeShifts.find((s) => s.userId === u.id);
               const isWorking = !!activeShift;

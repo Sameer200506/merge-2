@@ -10,11 +10,11 @@ import Link from "next/link";
 // Route accessibility rules by role
 const RESTRICTED_ROUTES: Record<string, string[]> = {
   sales_manager: ["/projects", "/tasks", "/settings/billing"],
-  project_manager: ["/leads", "/customers", "/pipeline", "/settings/billing"],
+  project_manager: ["/leads", "/customers", "/workflow", "/settings/billing"],
   team_member: [
     "/leads",
     "/customers",
-    "/pipeline",
+    "/workflow",
     "/settings/organization",
     "/settings/members",
     "/settings/billing",

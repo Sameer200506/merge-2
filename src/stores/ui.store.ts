@@ -15,7 +15,7 @@ interface UIState {
   // Notifications panel
   notificationsPanelOpen: boolean;
   // Active view modes per module
-  pipelineView: ViewMode;
+  workflowView: ViewMode;
   tasksView: ViewMode;
   // Actions
   toggleSidebar: () => void;
@@ -24,7 +24,7 @@ interface UIState {
   toggleTheme: () => void;
   setTheme: (theme: ThemeMode) => void;
   setNotificationsPanelOpen: (open: boolean) => void;
-  setPipelineView: (view: ViewMode) => void;
+  setWorkflowView: (view: ViewMode) => void;
   setTasksView: (view: ViewMode) => void;
 }
 
@@ -36,7 +36,7 @@ export const useUIStore = create<UIState>()(
       commandOpen: false,
       theme: "dark",
       notificationsPanelOpen: false,
-      pipelineView: "kanban",
+      workflowView: "kanban",
       tasksView: "list",
 
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -50,7 +50,7 @@ export const useUIStore = create<UIState>()(
       setTheme: (theme) => set({ theme }),
 
       setNotificationsPanelOpen: (open) => set({ notificationsPanelOpen: open }),
-      setPipelineView: (view) => set({ pipelineView: view }),
+      setWorkflowView: (view) => set({ workflowView: view }),
       setTasksView: (view) => set({ tasksView: view }),
     }),
     {
@@ -58,7 +58,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         theme: state.theme,
-        pipelineView: state.pipelineView,
+        workflowView: state.workflowView,
         tasksView: state.tasksView,
       }),
     }

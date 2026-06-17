@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, TrendingUp, Building2, DollarSign, Calendar, User, Tag, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockCustomers, mockPipeline, mockUsers } from "@/lib/mock-data";
+import { mockCustomers, mockWorkflow, mockUsers } from "@/lib/mock-data";
 import { toast } from "sonner";
 import type { DealPriority } from "@/types";
 
@@ -23,7 +23,7 @@ export function NewDealSheet({ open, onClose }: NewDealSheetProps) {
   const [form, setForm] = useState({
     title: "",
     customerId: "",
-    stageId: mockPipeline.stages[0]?.id ?? "",
+    stageId: mockWorkflow.stages[0]?.id ?? "",
     value: "",
     probability: "25",
     priority: "medium" as DealPriority,
@@ -50,7 +50,7 @@ export function NewDealSheet({ open, onClose }: NewDealSheetProps) {
     setForm({
       title: "",
       customerId: "",
-      stageId: mockPipeline.stages[0]?.id ?? "",
+      stageId: mockWorkflow.stages[0]?.id ?? "",
       value: "",
       probability: "25",
       priority: "medium",
@@ -86,7 +86,7 @@ export function NewDealSheet({ open, onClose }: NewDealSheetProps) {
             </div>
             <div>
               <h2 className="text-[14px] font-semibold text-[var(--foreground)]">New Deal</h2>
-              <p className="text-[11.5px] text-[var(--foreground-muted)]">Add to pipeline</p>
+              <p className="text-[11.5px] text-[var(--foreground-muted)]">Add to workflow</p>
             </div>
           </div>
           <button
@@ -139,19 +139,19 @@ export function NewDealSheet({ open, onClose }: NewDealSheetProps) {
             {/* Stage */}
             <div>
               <label className="block text-[12px] font-medium text-[var(--foreground-muted)] mb-1.5">
-                Pipeline Stage
+                Workflow Stage
               </label>
               <div className="relative">
                 <select
                   value={form.stageId}
                   onChange={(e) => {
-                    const stage = mockPipeline.stages.find((s) => s.id === e.target.value);
+                    const stage = mockWorkflow.stages.find((s) => s.id === e.target.value);
                     set("stageId", e.target.value);
                     if (stage) set("probability", String(stage.probability));
                   }}
                   className="sos-input appearance-none pr-8"
                 >
-                  {mockPipeline.stages.map((s) => (
+                  {mockWorkflow.stages.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>

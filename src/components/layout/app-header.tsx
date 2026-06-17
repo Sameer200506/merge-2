@@ -30,7 +30,7 @@ import { useUIStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
 import { useShiftsStore } from "@/stores/shifts.store";
 import { useChatStore } from "@/stores/chat.store";
-import { mockNotifications } from "@/lib/mock-data";
+import { mockNotifications, mockUsers } from "@/lib/mock-data";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -38,7 +38,7 @@ import { toast } from "sonner";
 const breadcrumbMap: Record<string, string> = {
   dashboard: "Dashboard",
   customers: "Customers",
-  pipeline: "Pipeline",
+  workflow: "Workflow",
   projects: "Projects",
   tasks: "Tasks",
   activity: "Activity",
@@ -170,7 +170,7 @@ function NotificationsPanel({
                 key={notif.id}
                 onClick={() => {
                   if (notif.type === "task_assigned") router.push("/tasks");
-                  else if (notif.type === "deal_won") router.push("/pipeline");
+                  else if (notif.type === "deal_won") router.push("/workflow");
                   else if (notif.type === "project_update") router.push("/projects");
                   onClose();
                 }}
@@ -363,33 +363,150 @@ function formatDuration(totalSeconds: number) {
   ].join(":");
 }
 
+// ── Staff Shifts Panel ──────────────────────────────────────────
+function StaffShiftsPanel({
+  open,
+  onClose,
+  anchorRef,
+}: {
+  open: boolean;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const { activeShifts, shifts } = useShiftsStore();
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        panelRef.current &&
+        !panelRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open, onClose, anchorRef]);
+
+  if (!open) return null;
+
+  const staffHours: Record<string, { userId: string; active: boolean; durationSeconds: number }> = {};
+  
+  shifts.forEach(s => {
+    if (!staffHours[s.userId]) staffHours[s.userId] = { userId: s.userId, active: false, durationSeconds: 0 };
+    staffHours[s.userId].durationSeconds += s.durationSeconds;
+  });
+
+  activeShifts.forEach(s => {
+    if (!staffHours[s.userId]) staffHours[s.userId] = { userId: s.userId, active: false, durationSeconds: 0 };
+    staffHours[s.userId].durationSeconds += s.durationSeconds;
+    staffHours[s.userId].active = true;
+  });
+
+  const staffList = Object.values(staffHours).filter((staff) => {
+    const userObj = mockUsers.find((u) => u.id === staff.userId);
+    return userObj?.role !== "owner";
+  });
+
+  return (
+    <div
+      ref={panelRef}
+      className={cn(
+        "absolute right-0 top-[calc(100%+8px)] w-[260px] z-50",
+        "bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl",
+        "animate-scale-in origin-top-right"
+      )}
+    >
+      <div className="px-4 py-3 border-b border-[var(--border)]">
+        <h3 className="text-[13.5px] font-semibold text-[var(--foreground)]">Individual Staff Hours</h3>
+      </div>
+      <div className="max-h-[300px] overflow-y-auto py-2 px-2 space-y-1">
+        {staffList.length === 0 ? (
+           <div className="py-6 text-center text-[12px] text-[var(--foreground-muted)]">No staff hours recorded.</div>
+        ) : (
+          staffList.map((staff) => {
+             const userObj = mockUsers.find(u => u.id === staff.userId);
+             const hrs = Math.floor(staff.durationSeconds / 3600);
+             const mins = Math.floor((staff.durationSeconds % 3600) / 60);
+             return (
+               <div key={staff.userId} className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--background-subtle)] transition-colors">
+                 <div className="flex items-center gap-2.5">
+                   <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                     {userObj ? getInitials(userObj.displayName) : "?"}
+                   </div>
+                   <div className="min-w-0">
+                     <p className="text-[12.5px] font-medium text-[var(--foreground)] leading-none mb-1">{userObj?.displayName || "Unknown"}</p>
+                     <p className="text-[11px] text-[var(--foreground-subtle)] leading-none flex items-center gap-1.5">
+                       {staff.active ? (
+                         <>
+                           <span className="relative flex h-1.5 w-1.5">
+                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                           </span>
+                           <span className="text-emerald-500">Active</span>
+                         </>
+                       ) : (
+                         <>
+                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                           <span>Offline</span>
+                         </>
+                       )}
+                     </p>
+                   </div>
+                 </div>
+                 <div className="text-[12.5px] font-mono text-[var(--foreground-muted)] font-medium">
+                   {hrs}h {mins}m
+                 </div>
+               </div>
+             )
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── App Header ────────────────────────────────────────────────
 export function AppHeader() {
   const { setCommandOpen, toggleSidebar } = useUIStore();
   const { theme } = useUIStore();
   const { user } = useAuthStore();
-  const { activeShifts, clockIn, clockOut } = useShiftsStore();
+  const { activeShifts, shifts, clockIn, clockOut } = useShiftsStore();
   const { setIsOpen: setChatIsOpen } = useChatStore();
   const activeShift = user ? activeShifts.find((s) => s.userId === user.id) : null;
   const isClockedIn = !!activeShift;
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [staffShiftsOpen, setStaffShiftsOpen] = useState(false);
   const [notifications, setNotifications] = useState(mockNotifications);
 
   const notifRef = useRef<HTMLButtonElement>(null);
   const avatarRef = useRef<HTMLButtonElement>(null);
+  const staffShiftsRef = useRef<HTMLButtonElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const toggleNotif = () => {
     setUserMenuOpen(false);
+    setStaffShiftsOpen(false);
     setNotifOpen((v) => !v);
   };
 
   const toggleUserMenu = () => {
     setNotifOpen(false);
+    setStaffShiftsOpen(false);
     setUserMenuOpen((v) => !v);
+  };
+
+  const toggleStaffShifts = () => {
+    setUserMenuOpen(false);
+    setNotifOpen(false);
+    setStaffShiftsOpen((v) => !v);
   };
 
   const markAllRead = () => {
@@ -414,13 +531,7 @@ export function AppHeader() {
     >
       {/* Left */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={toggleSidebar}
-          className="sos-btn sos-btn-ghost p-1.5 md:hidden"
-          aria-label="Toggle menu"
-        >
-          <Menu size={16} />
-        </button>
+
         <Breadcrumb />
       </div>
 
@@ -450,48 +561,98 @@ export function AppHeader() {
           <Search size={16} />
         </button>
 
-        {/* Shift Timer */}
+        {/* Shift Controls */}
         {user && (
-          <div className="flex items-center gap-2 bg-[var(--background-muted)] border border-[var(--border)] rounded-lg p-1 px-2.5 h-8">
-            {isClockedIn ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="font-mono text-[12.5px] font-semibold text-[var(--foreground)] w-16 text-center">
-                  {activeShift ? formatDuration(activeShift.durationSeconds) : "00:00:00"}
-                </span>
+          <div className="flex items-center gap-3">
+            {/* Staff Time Dropdown (Managers only) */}
+            {user.role !== "team_member" && (
+              <div className="relative">
                 <button
-                  onClick={() => {
-                    clockOut(user.id);
-                    toast.success("Clocked out of shift successfully.");
-                  }}
-                  className="sos-btn sos-btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md cursor-pointer flex items-center justify-center"
-                  title="Clock Out"
-                  aria-label="Clock Out"
+                  ref={staffShiftsRef}
+                  onClick={toggleStaffShifts}
+                  className={cn(
+                    "flex items-center gap-2 bg-[var(--background-muted)] border rounded-lg p-1 px-2.5 h-8 transition-colors cursor-pointer",
+                    staffShiftsOpen ? "border-[var(--primary)]" : "border-[var(--border)] hover:border-[var(--border-strong)]"
+                  )}
+                  title="View Staff Shifts"
                 >
-                  <Square size={11} fill="currentColor" />
+                  {activeShifts.filter(s => mockUsers.find(u => u.id === s.userId)?.role !== "owner").length > 0 ? (
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  )}
+                  <span className="text-[12px] font-medium text-[var(--foreground-muted)]">
+                    Staff Time
+                  </span>
                 </button>
-              </>
-            ) : (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                <span className="text-[12px] font-medium text-[var(--foreground-muted)]">
-                  Off Shift
+                <StaffShiftsPanel
+                  open={staffShiftsOpen}
+                  onClose={() => setStaffShiftsOpen(false)}
+                  anchorRef={staffShiftsRef}
+                />
+              </div>
+            )}
+
+            {/* Total Work Time Pill */}
+            {user.role !== "owner" && (
+              <div className="hidden sm:flex items-center gap-1.5 bg-[var(--background-subtle)] border border-[var(--border)] rounded-lg px-2.5 h-8">
+                <span className="text-[10.5px] text-[var(--foreground-subtle)] uppercase tracking-wider font-bold">Total</span>
+                <span className="text-[12.5px] font-mono font-medium text-[var(--foreground)]">
+                  {(() => {
+                    const myTotalSeconds = shifts.filter(s => s.userId === user.id).reduce((acc, s) => acc + s.durationSeconds, 0) + (activeShift?.durationSeconds || 0);
+                    return formatDuration(myTotalSeconds);
+                  })()}
                 </span>
-                <button
-                  onClick={() => {
-                    clockIn(user.id);
-                    toast.success("Clocked in to shift successfully!");
-                  }}
-                  className="sos-btn sos-btn-ghost p-1 text-[#6366f1] hover:bg-[#6366f1]/10 rounded-md cursor-pointer flex items-center justify-center"
-                  title="Clock In"
-                  aria-label="Clock In"
-                >
-                  <Play size={11} fill="currentColor" />
-                </button>
-              </>
+              </div>
+            )}
+            
+            {/* Active Shift Control */}
+            {user.role !== "owner" && (
+              <div className="flex items-center gap-2 bg-[var(--background-muted)] border border-[var(--border)] rounded-lg p-1 px-2.5 h-8">
+                {isClockedIn ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="font-mono text-[12.5px] font-semibold text-[var(--foreground)] w-16 text-center">
+                      {activeShift ? formatDuration(activeShift.durationSeconds) : "00:00:00"}
+                    </span>
+                    <button
+                      onClick={() => {
+                        clockOut(user.id);
+                        toast.success("Clocked out of shift successfully.");
+                      }}
+                      className="sos-btn sos-btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md cursor-pointer flex items-center justify-center"
+                      title="Clock Out"
+                      aria-label="Clock Out"
+                    >
+                      <Square size={11} fill="currentColor" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span className="text-[12px] font-medium text-[var(--foreground-muted)]">
+                      Off Shift
+                    </span>
+                    <button
+                      onClick={() => {
+                        clockIn(user.id);
+                        toast.success("Clocked in to shift successfully!");
+                      }}
+                      className="sos-btn sos-btn-ghost p-1 text-[#6366f1] hover:bg-[#6366f1]/10 rounded-md cursor-pointer flex items-center justify-center"
+                      title="Clock In"
+                      aria-label="Clock In"
+                    >
+                      <Play size={11} fill="currentColor" />
+                    </button>
+                  </>
+                )}
+              </div>
             )}
           </div>
         )}

@@ -61,7 +61,7 @@ export function ReportsSheet({ open, onClose }: ReportsSheetProps) {
         { name: "Referral", value: 1, color: "#10b981" }
       ];
 
-  // 2. Process Deals Pipeline stages
+  // 2. Process Deals Workflow stages
   const dealsByStage = mockDeals.reduce((acc, deal) => {
     // Stage counts
     const stageName = deal.stageId.replace("stage_", "").replace("_", " ");
@@ -69,7 +69,7 @@ export function ReportsSheet({ open, onClose }: ReportsSheetProps) {
     return acc;
   }, {} as Record<string, number>);
 
-  const pipelineData = Object.entries(dealsByStage).map(([stage, count]) => ({
+  const workflowData = Object.entries(dealsByStage).map(([stage, count]) => ({
     stage: stage.charAt(0).toUpperCase() + stage.slice(1),
     count,
   }));
@@ -145,7 +145,7 @@ export function ReportsSheet({ open, onClose }: ReportsSheetProps) {
               <p className="text-[18px] font-bold text-[var(--foreground)] mt-1">{mockProjects.length}</p>
             </div>
             <div className="text-center">
-              <p className="text-[11px] text-[var(--foreground-subtle)] font-medium uppercase tracking-wider">Leads Pipeline</p>
+              <p className="text-[11px] text-[var(--foreground-subtle)] font-medium uppercase tracking-wider">Leads Workflow</p>
               <p className="text-[18px] font-bold text-[#22c55e] mt-1">
                 {formatCurrency(leads.reduce((s, l) => s + l.value, 0))}
               </p>
@@ -225,9 +225,9 @@ export function ReportsSheet({ open, onClose }: ReportsSheetProps) {
             </div>
           </div>
 
-          {/* Chart 3: Pipeline Stage Bar Chart & Project Delivery */}
+          {/* Chart 3: Workflow Stage Bar Chart & Project Delivery */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Sales Pipeline stages */}
+            {/* Sales Workflow stages */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <BarChart2 size={15} className="text-[#f59e0b]" />
@@ -235,7 +235,7 @@ export function ReportsSheet({ open, onClose }: ReportsSheetProps) {
               </div>
               <div className="sos-card p-4 bg-[var(--background-subtle)]/30 border border-[var(--border)]">
                 <ResponsiveContainer width="100%" height={140}>
-                  <BarChart data={pipelineData} barSize={10}>
+                  <BarChart data={workflowData} barSize={10}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="stage" tick={{ fontSize: 9, fill: "var(--foreground-muted)" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 9, fill: "var(--foreground-muted)" }} axisLine={false} tickLine={false} />

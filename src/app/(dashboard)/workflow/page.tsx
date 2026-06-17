@@ -40,7 +40,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn, formatCurrency, formatDate, getInitials } from "@/lib/utils";
-import { mockDeals, mockPipeline, mockCustomers, getUserById, mockUsers } from "@/lib/mock-data";
+import { mockDeals, mockWorkflow, mockCustomers, getUserById, mockUsers } from "@/lib/mock-data";
 import type { Deal, DealPriority } from "@/types";
 
 const priorityConfig: Record<DealPriority, { label: string; color: string; dot: string }> = {
@@ -210,7 +210,7 @@ function TableView({ deals }: { deals: Deal[] }) {
       {deals.map((deal) => {
         const customer = mockCustomers.find((c) => c.id === deal.customerId);
         const owner = getUserById(deal.ownerId);
-        const stage = mockPipeline.stages.find((s) => s.id === deal.stageId);
+        const stage = mockWorkflow.stages.find((s) => s.id === deal.stageId);
         const priority = priorityConfig[deal.priority];
         return (
           <div key={deal.id} className="flex items-center gap-4 px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--background-subtle)] transition-colors">
@@ -240,8 +240,8 @@ function TableView({ deals }: { deals: Deal[] }) {
   );
 }
 
-// ── Main Pipeline ─────────────────────────────────────────────
-export default function PipelinePage() {
+// ── Main Workflow ─────────────────────────────────────────────
+export default function WorkflowPage() {
   const [view, setView] = useState<"kanban" | "table">("kanban");
   const [deals, setDeals] = useState(mockDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -258,7 +258,7 @@ export default function PipelinePage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const totalPipelineValue = deals
+  const totalWorkflowValue = deals
     .filter((d) => !d.isWon && !d.isLost)
     .reduce((s, d) => s + d.value * (d.probability / 100), 0);
 
@@ -288,9 +288,9 @@ export default function PipelinePage() {
       {/* Header */}
       <div className="page-header mb-4">
         <div>
-          <h1 className="page-title">Pipeline</h1>
+          <h1 className="page-title">Workflow</h1>
           <p className="text-[13px] text-[var(--foreground-muted)] mt-0.5">
-            {formatCurrency(totalPipelineValue)} weighted forecast · {deals.filter((d) => !d.isWon && !d.isLost).length} active deals
+            {formatCurrency(totalWorkflowValue)} weighted forecast · {deals.filter((d) => !d.isWon && !d.isLost).length} active deals
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -375,7 +375,7 @@ export default function PipelinePage() {
 
       {/* Revenue bar */}
       <div className="flex items-center gap-4 mb-4 p-3 sos-card">
-        {mockPipeline.stages.slice(0, 5).map((stage) => {
+        {mockWorkflow.stages.slice(0, 5).map((stage) => {
           const stageValue = filteredDeals
             .filter((d) => d.stageId === stage.id)
             .reduce((s, d) => s + d.value, 0);
@@ -398,7 +398,7 @@ export default function PipelinePage() {
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-3 overflow-x-auto pb-4 flex-1">
-            {mockPipeline.stages.map((stage) => (
+            {mockWorkflow.stages.map((stage) => (
               <KanbanColumn
                 key={stage.id}
                 stageId={stage.id}

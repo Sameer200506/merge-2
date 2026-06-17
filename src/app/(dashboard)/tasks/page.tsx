@@ -67,7 +67,17 @@ const priorityConfig: Record<TaskPriority, { label: string; color: string }> = {
 const KANBAN_COLUMNS: TaskStatus[] = ["backlog", "todo", "in_progress", "in_review", "done"];
 
 // ── Task Row (List view) ──────────────────────────────────────
-function TaskRow({ task }: { task: Task }) {
+function TaskRow({
+  task,
+  onEdit,
+  onDelete,
+  canManage,
+}: {
+  task: Task;
+  onEdit: (task: Task) => void;
+  onDelete: (taskId: string) => void;
+  canManage: boolean;
+}) {
   const assignee = getUserById(task.assigneeId ?? "");
   const project = mockProjects.find((p) => p.id === task.projectId);
   const statusCfg = statusConfig[task.status];
@@ -103,18 +113,32 @@ function TaskRow({ task }: { task: Task }) {
           {getInitials(assignee.displayName)}
         </div>
       )}
-      <div className="opacity-0 group-hover:opacity-100">
-        <ActionMenu actions={[
-          { label: "Edit Task", icon: Pencil, onClick: () => toast.info("Edit task feature coming soon") },
-          { label: "Delete Task", icon: Trash2, danger: true, onClick: () => toast.success("Task deleted") },
-        ]} />
-      </div>
+      {canManage && (
+        <div className="opacity-0 group-hover:opacity-100">
+          <ActionMenu actions={[
+            { label: "Edit Task", icon: Pencil, onClick: () => onEdit(task) },
+            { label: "Delete Task", icon: Trash2, danger: true, onClick: () => onDelete(task.id) },
+          ]} />
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Task Kanban Card ──────────────────────────────────────────
-function TaskKanbanCard({ task, isDragging = false }: { task: Task; isDragging?: boolean }) {
+function TaskKanbanCard({
+  task,
+  isDragging = false,
+  onEdit,
+  onDelete,
+  canManage,
+}: {
+  task: Task;
+  isDragging?: boolean;
+  onEdit: (task: Task) => void;
+  onDelete: (taskId: string) => void;
+  canManage: boolean;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isSortDragging ? 0.4 : 1 };
   const assignee = getUserById(task.assigneeId ?? "");
@@ -125,13 +149,23 @@ function TaskKanbanCard({ task, isDragging = false }: { task: Task; isDragging?:
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={cn("kanban-card p-3 mb-2", isDragging && "shadow-2xl rotate-1 scale-105")}
+      className={cn("kanban-card p-3 mb-2 group/card relative", isDragging && "shadow-2xl rotate-1 scale-105")}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="text-[13px] font-medium text-[var(--foreground)] leading-tight flex-1">{task.title}</p>
-        <button {...listeners} className="p-0.5 text-[var(--foreground-subtle)] cursor-grab active:cursor-grabbing flex-shrink-0">
-          <Grip size={12} />
-        </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {canManage && (
+            <div className="opacity-0 group-hover/card:opacity-100 transition-opacity">
+              <ActionMenu actions={[
+                { label: "Edit Task", icon: Pencil, onClick: () => onEdit(task) },
+                { label: "Delete Task", icon: Trash2, danger: true, onClick: () => onDelete(task.id) },
+              ]} />
+            </div>
+          )}
+          <button {...listeners} className="p-0.5 text-[var(--foreground-subtle)] cursor-grab active:cursor-grabbing">
+            <Grip size={12} />
+          </button>
+        </div>
       </div>
       {task.checklist.length > 0 && (
         <div className="mb-2">
@@ -171,11 +205,17 @@ function KanbanColumn({
   tasks,
   onAddTask,
   showAddTask = true,
+  onEdit,
+  onDelete,
+  canManage,
 }: {
   status: TaskStatus;
   tasks: Task[];
   onAddTask: (status: TaskStatus) => void;
   showAddTask?: boolean;
+  onEdit: (task: Task) => void;
+  onDelete: (taskId: string) => void;
+  canManage: boolean;
 }) {
   const cfg = statusConfig[status];
   return (
@@ -199,7 +239,15 @@ function KanbanColumn({
       </div>
       <div className="flex-1 px-2 pb-2 overflow-y-auto">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((task) => <TaskKanbanCard key={task.id} task={task} />)}
+          {tasks.map((task) => (
+            <TaskKanbanCard
+              key={task.id}
+              task={task}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              canManage={canManage}
+            />
+          ))}
         </SortableContext>
         {tasks.length === 0 && (
           <div className="flex items-center justify-center h-16 text-[12px] text-[var(--foreground-subtle)] border-2 border-dashed border-[var(--border)] rounded-lg">
@@ -220,14 +268,60 @@ export default function TasksPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [newTaskDefaultStatus, setNewTaskDefaultStatus] = useState<TaskStatus>("todo");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [filterOpen, setFilterOpen] = useState(false);
 
+  const canManage = user?.role === "owner" || user?.role === "project_manager" || user?.role === "sales_manager";
+
   const openNewTask = (status: TaskStatus = "todo") => {
+    setEditingTask(null);
     setNewTaskDefaultStatus(status);
     setNewTaskOpen(true);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setNewTaskOpen(true);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    toast.success("Task deleted");
+  };
+
+  const handleCreateOrUpdateTask = (taskData: any) => {
+    if (editingTask) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === editingTask.id
+            ? {
+                ...t,
+                ...taskData,
+                updatedAt: new Date().toISOString(),
+              }
+            : t
+        )
+      );
+    } else {
+      const newTask: Task = {
+        id: `task_${Date.now()}`,
+        organizationId: user?.organizationId || "org_1",
+        ...taskData,
+        checklist: [],
+        dependencies: [],
+        attachments: [],
+        isRecurring: false,
+        order: tasks.length,
+        createdBy: user?.id || "user_1",
+        updatedBy: user?.id || "user_1",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setTasks((prev) => [...prev, newTask]);
+    }
   };
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -403,7 +497,15 @@ export default function TasksPage() {
                   <span className="text-[12px] font-semibold text-[var(--foreground)]">{cfg.label}</span>
                   <span className="text-[11px] text-[var(--foreground-subtle)]">{statusTasks.length}</span>
                 </div>
-                {statusTasks.map((task) => <TaskRow key={task.id} task={task} />)}
+                {statusTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    onEdit={handleEditTask}
+                    onDelete={handleDeleteTask}
+                    canManage={canManage}
+                  />
+                ))}
               </div>
             );
           })}
@@ -428,19 +530,35 @@ export default function TasksPage() {
                 tasks={groupByStatus(status)}
                 onAddTask={openNewTask}
                 showAddTask={user?.role !== "team_member"}
+                onEdit={handleEditTask}
+                onDelete={handleDeleteTask}
+                canManage={canManage}
               />
             ))}
           </div>
           <DragOverlay>
-            {activeTask && <TaskKanbanCard task={activeTask} isDragging />}
+            {activeTask && (
+              <TaskKanbanCard
+                task={activeTask}
+                isDragging
+                onEdit={handleEditTask}
+                onDelete={handleDeleteTask}
+                canManage={canManage}
+              />
+            )}
           </DragOverlay>
         </DndContext>
       )}
 
       <NewTaskSheet
         open={newTaskOpen}
-        onClose={() => setNewTaskOpen(false)}
+        onClose={() => {
+          setNewTaskOpen(false);
+          setEditingTask(null);
+        }}
         defaultStatus={newTaskDefaultStatus}
+        taskToEdit={editingTask}
+        onSubmit={handleCreateOrUpdateTask}
       />
     </div>
   );

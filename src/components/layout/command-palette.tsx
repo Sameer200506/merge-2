@@ -21,7 +21,7 @@ import { useState } from "react";
 const quickLinks = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", group: "Navigation" },
   { href: "/customers", icon: Building2, label: "Customers", group: "Navigation" },
-  { href: "/pipeline", icon: TrendingUp, label: "Pipeline", group: "Navigation" },
+  { href: "/workflow", icon: TrendingUp, label: "Workflow", group: "Navigation" },
   { href: "/projects", icon: FolderKanban, label: "Projects", group: "Navigation" },
   { href: "/tasks", icon: CheckSquare, label: "Tasks", group: "Navigation" },
   { href: "/activity", icon: Activity, label: "Activity Feed", group: "Navigation" },
@@ -150,7 +150,7 @@ export function CommandPalette() {
                   items={filteredDeals.map((d) => ({
                     label: d.title,
                     sub: `$${d.value.toLocaleString()}`,
-                    href: `/pipeline`,
+                    href: `/workflow`,
                     icon: TrendingUp,
                   }))}
                   onSelect={handleSelect}

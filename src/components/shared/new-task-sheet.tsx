@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   CheckSquare,
@@ -20,6 +20,8 @@ interface NewTaskSheetProps {
   open: boolean;
   onClose: () => void;
   defaultStatus?: TaskStatus;
+  taskToEdit?: any;
+  onSubmit?: (taskData: any) => void;
 }
 
 const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
@@ -44,7 +46,7 @@ const TYPES: { value: TaskType; label: string }[] = [
   { value: "support", label: "Support" },
 ];
 
-export function NewTaskSheet({ open, onClose, defaultStatus = "todo" }: NewTaskSheetProps) {
+export function NewTaskSheet({ open, onClose, defaultStatus = "todo", taskToEdit, onSubmit }: NewTaskSheetProps) {
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -59,6 +61,38 @@ export function NewTaskSheet({ open, onClose, defaultStatus = "todo" }: NewTaskS
   });
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (open) {
+      if (taskToEdit) {
+        setForm({
+          title: taskToEdit.title,
+          description: taskToEdit.description || "",
+          type: taskToEdit.type || "project",
+          status: taskToEdit.status,
+          priority: taskToEdit.priority,
+          assigneeId: taskToEdit.assigneeId || "",
+          projectId: taskToEdit.projectId || "",
+          dueDate: taskToEdit.dueDate ? taskToEdit.dueDate.split("T")[0] : "",
+          estimatedHours: taskToEdit.estimatedHours ? String(taskToEdit.estimatedHours) : "",
+          tags: taskToEdit.tags ? taskToEdit.tags.join(", ") : "",
+        });
+      } else {
+        setForm({
+          title: "",
+          description: "",
+          type: "project",
+          status: defaultStatus,
+          priority: "medium",
+          assigneeId: "",
+          projectId: "",
+          dueDate: "",
+          estimatedHours: "",
+          tags: "",
+        });
+      }
+    }
+  }, [open, taskToEdit, defaultStatus]);
+
   const set = (key: keyof typeof form, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
 
@@ -71,20 +105,30 @@ export function NewTaskSheet({ open, onClose, defaultStatus = "todo" }: NewTaskS
     setSaving(true);
     await new Promise((r) => setTimeout(r, 700));
     setSaving(false);
-    toast.success(`Task "${form.title}" created!`);
+
+    const tagsArray = form.tags
+      ? form.tags.split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
+
+    const taskData = {
+      title: form.title,
+      description: form.description,
+      type: form.type,
+      status: form.status,
+      priority: form.priority,
+      assigneeId: form.assigneeId || undefined,
+      projectId: form.projectId || undefined,
+      dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
+      estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : undefined,
+      tags: tagsArray,
+    };
+
+    if (onSubmit) {
+      onSubmit(taskData);
+    }
+
+    toast.success(taskToEdit ? `Task updated successfully!` : `Task "${form.title}" created!`);
     onClose();
-    setForm({
-      title: "",
-      description: "",
-      type: "project",
-      status: defaultStatus,
-      priority: "medium",
-      assigneeId: "",
-      projectId: "",
-      dueDate: "",
-      estimatedHours: "",
-      tags: "",
-    });
   };
 
   if (!open) return null;
@@ -106,8 +150,12 @@ export function NewTaskSheet({ open, onClose, defaultStatus = "todo" }: NewTaskS
               <CheckSquare size={15} className="text-white" />
             </div>
             <div>
-              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">New Task</h2>
-              <p className="text-[11.5px] text-[var(--foreground-muted)]">Add a task to your board</p>
+              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">
+                {taskToEdit ? "Edit Task" : "New Task"}
+              </h2>
+              <p className="text-[11.5px] text-[var(--foreground-muted)]">
+                {taskToEdit ? "Modify task details" : "Add a task to your board"}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="sos-btn sos-btn-ghost p-1.5"><X size={16} /></button>
@@ -319,7 +367,7 @@ export function NewTaskSheet({ open, onClose, defaultStatus = "todo" }: NewTaskS
             className="sos-btn sos-btn-primary flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckSquare size={13} />
-            {saving ? "Creating..." : "Create Task"}
+            {saving ? (taskToEdit ? "Saving..." : "Creating...") : (taskToEdit ? "Save Changes" : "Create Task")}
           </button>
         </div>
       </div>
