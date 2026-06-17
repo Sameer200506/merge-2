@@ -17,7 +17,7 @@ const plans = [
     name: "Growth",
     price: 99,
     description: "The complete platform for growing teams.",
-    features: ["Up to 20 users", "Unlimited projects", "Full CRM + Pipeline", "Priority support", "Automations", "Advanced analytics"],
+    features: ["Up to 20 users", "Unlimited projects", "Full CRM + Workflow", "Priority support", "Automations", "Advanced analytics"],
     cta: "Current Plan",
     highlight: true,
     current: true,

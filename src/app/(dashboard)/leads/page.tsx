@@ -204,7 +204,7 @@ export default function LeadsPage() {
           { label: "Total Active Leads", value: totalLeadsCount, icon: Target, color: "var(--primary)" },
           { label: "New Leads", value: newLeadsCount, icon: Users, color: "#3b82f6" },
           { label: "Qualified Leads", value: qualifiedLeadsCount, icon: Award, color: "#22c55e" },
-          { label: "Qualified Pipeline", value: formatCurrency(estPipelineValue), icon: TrendingUp, color: "#f59e0b" },
+          { label: "Qualified Workflow", value: formatCurrency(estPipelineValue), icon: TrendingUp, color: "#f59e0b" },
         ].map((stat) => (
           <div key={stat.label} className="sos-card p-4 flex items-center justify-between">
             <div>

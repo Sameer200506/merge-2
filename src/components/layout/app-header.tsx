@@ -36,7 +36,7 @@ import { toast } from "sonner";
 const breadcrumbMap: Record<string, string> = {
   dashboard: "Dashboard",
   customers: "Customers",
-  pipeline: "Pipeline",
+  workflow: "Workflow",
   projects: "Projects",
   tasks: "Tasks",
   activity: "Activity",
@@ -168,7 +168,7 @@ function NotificationsPanel({
                 key={notif.id}
                 onClick={() => {
                   if (notif.type === "task_assigned") router.push("/tasks");
-                  else if (notif.type === "deal_won") router.push("/pipeline");
+                  else if (notif.type === "deal_won") router.push("/workflow");
                   else if (notif.type === "project_update") router.push("/projects");
                   onClose();
                 }}
