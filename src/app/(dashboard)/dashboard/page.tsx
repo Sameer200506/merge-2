@@ -185,8 +185,8 @@ function CustomTooltip({ active, payload, label }: {
   );
 }
 
-// ── Pipeline Stage Bar ────────────────────────────────────────
-function PipelineStageBar() {
+// ── Workflow Stage Bar ────────────────────────────────────────
+function WorkflowStageBar() {
   const stages = [
     { name: "Lead", count: 2, color: "#6366f1" },
     { name: "Qualified", count: 1, color: "#8b5cf6" },
@@ -481,9 +481,9 @@ export default function DashboardPage() {
       {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Pipeline Value"
-          value={formatCurrency(metrics.pipelineValue)}
-          change={metrics.pipelineChange}
+          title="Workflow Value"
+          value={formatCurrency(metrics.workflowValue)}
+          change={metrics.workflowChange}
           changeLabel="vs last month"
           icon={DollarSign}
           iconColor="text-[var(--primary)]"
@@ -557,22 +557,22 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* Pipeline breakdown */}
+        {/* Workflow breakdown */}
         <div className="sos-card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Pipeline</h2>
+              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Workflow</h2>
               <p className="text-[12px] text-[var(--foreground-muted)]">By stage</p>
             </div>
             <TrendingUp size={15} className="text-[var(--primary)]" />
           </div>
           <div className="mb-4">
             <p className="text-[26px] font-bold text-[var(--foreground)] tracking-tight">
-              {formatCurrency(metrics.pipelineValue)}
+              {formatCurrency(metrics.workflowValue)}
             </p>
-            <p className="text-[12px] text-[var(--foreground-muted)]">Total pipeline value</p>
+            <p className="text-[12px] text-[var(--foreground-muted)]">Total workflow value</p>
           </div>
-          <PipelineStageBar />
+          <WorkflowStageBar />
         </div>
       </div>
 

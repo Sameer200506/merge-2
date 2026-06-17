@@ -129,16 +129,16 @@ export interface Contact extends BaseEntity {
   notes?: string;
 }
 
-// ─── Pipeline & Deals ────────────────────────────────────────
-export interface Pipeline extends BaseEntity {
+// ─── Workflow & Deals ────────────────────────────────────────
+export interface Workflow extends BaseEntity {
   name: string;
   description?: string;
-  stages: PipelineStage[];
+  stages: WorkflowStage[];
   isDefault: boolean;
   currency: string;
 }
 
-export interface PipelineStage {
+export interface WorkflowStage {
   id: ID;
   name: string;
   order: number;
@@ -153,7 +153,7 @@ export type DealPriority = "low" | "medium" | "high" | "critical";
 export interface Deal extends BaseEntity {
   title: string;
   customerId: ID;
-  pipelineId: ID;
+  workflowId: ID;
   stageId: ID;
   value: number;
   currency: string;
@@ -365,8 +365,8 @@ export type ThemeMode = "light" | "dark" | "system";
 export interface DashboardMetrics {
   leadsThisWeek: number;
   leadsChange: number;
-  pipelineValue: number;
-  pipelineChange: number;
+  workflowValue: number;
+  workflowChange: number;
   revenueForecasted: number;
   revenueChange: number;
   activeProjects: number;
