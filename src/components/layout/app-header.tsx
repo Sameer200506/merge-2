@@ -366,7 +366,7 @@ export function AppHeader() {
   const { setCommandOpen, toggleSidebar } = useUIStore();
   const { theme } = useUIStore();
   const { user } = useAuthStore();
-  const { activeShifts, clockIn, clockOut } = useShiftsStore();
+  const { activeShifts, shifts, clockIn, clockOut } = useShiftsStore();
   const activeShift = user ? activeShifts.find((s) => s.userId === user.id) : null;
   const isClockedIn = !!activeShift;
 
@@ -441,50 +441,72 @@ export function AppHeader() {
           <Search size={16} />
         </button>
 
-        {/* Shift Timer */}
+        {/* Shift Timer or Employee Shift Hours */}
         {user && (
-          <div className="flex items-center gap-2 bg-[var(--background-muted)] border border-[var(--border)] rounded-lg p-1 px-2.5 h-8">
-            {isClockedIn ? (
-              <>
+          user.role !== "team_member" ? (
+            <div className="flex items-center gap-2 bg-[var(--background-muted)] border border-[var(--border)] rounded-lg p-1 px-2.5 h-8" title="Total employee shift hours worked">
+              {activeShifts.length > 0 ? (
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="font-mono text-[12.5px] font-semibold text-[var(--foreground)] w-16 text-center">
-                  {activeShift ? formatDuration(activeShift.durationSeconds) : "00:00:00"}
-                </span>
-                <button
-                  onClick={() => {
-                    clockOut(user.id);
-                    toast.success("Clocked out of shift successfully.");
-                  }}
-                  className="sos-btn sos-btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md cursor-pointer flex items-center justify-center"
-                  title="Clock Out"
-                  aria-label="Clock Out"
-                >
-                  <Square size={11} fill="currentColor" />
-                </button>
-              </>
-            ) : (
-              <>
+              ) : (
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                <span className="text-[12px] font-medium text-[var(--foreground-muted)]">
-                  Off Shift
-                </span>
-                <button
-                  onClick={() => {
-                    clockIn(user.id);
-                    toast.success("Clocked in to shift successfully!");
-                  }}
-                  className="sos-btn sos-btn-ghost p-1 text-[#6366f1] hover:bg-[#6366f1]/10 rounded-md cursor-pointer flex items-center justify-center"
-                  title="Clock In"
-                  aria-label="Clock In"
-                >
-                  <Play size={11} fill="currentColor" />
-                </button>
-              </>
-            )}
-          </div>
+              )}
+              <span className="text-[12px] font-medium text-[var(--foreground-muted)]">
+                Staff: {(() => {
+                  const totalSeconds = shifts.reduce((acc, s) => acc + s.durationSeconds, 0) +
+                                       activeShifts.reduce((acc, s) => acc + s.durationSeconds, 0);
+                  const hrs = Math.floor(totalSeconds / 3600);
+                  const mins = Math.floor((totalSeconds % 3600) / 60);
+                  return `${hrs}h ${mins}m`;
+                })()}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-[var(--background-muted)] border border-[var(--border)] rounded-lg p-1 px-2.5 h-8">
+              {isClockedIn ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="font-mono text-[12.5px] font-semibold text-[var(--foreground)] w-16 text-center">
+                    {activeShift ? formatDuration(activeShift.durationSeconds) : "00:00:00"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      clockOut(user.id);
+                      toast.success("Clocked out of shift successfully.");
+                    }}
+                    className="sos-btn sos-btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md cursor-pointer flex items-center justify-center"
+                    title="Clock Out"
+                    aria-label="Clock Out"
+                  >
+                    <Square size={11} fill="currentColor" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  <span className="text-[12px] font-medium text-[var(--foreground-muted)]">
+                    Off Shift
+                  </span>
+                  <button
+                    onClick={() => {
+                      clockIn(user.id);
+                      toast.success("Clocked in to shift successfully!");
+                    }}
+                    className="sos-btn sos-btn-ghost p-1 text-[#6366f1] hover:bg-[#6366f1]/10 rounded-md cursor-pointer flex items-center justify-center"
+                    title="Clock In"
+                    aria-label="Clock In"
+                  >
+                    <Play size={11} fill="currentColor" />
+                  </button>
+                </>
+              )}
+            </div>
+          )
         )}
 
         {/* Notifications */}
