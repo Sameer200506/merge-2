@@ -1,8 +1,8 @@
-# Sync with upstream: Sameer200506/merge-2
+# Sync with upstream: Eaglefang1107/super-spork
 Write-Host "Syncing with upstream..." -ForegroundColor Cyan
 
 # Add upstream remote if not already added
-git remote add upstream https://github.com/Sameer200506/merge-2.git 2>$null
+git remote add upstream https://github.com/Eaglefang1107/super-spork.git 2>$null
 
 # Fetch latest from upstream
 Write-Host "Fetching upstream..." -ForegroundColor Yellow

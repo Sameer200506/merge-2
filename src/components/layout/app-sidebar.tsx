@@ -36,7 +36,7 @@ const navGroups = [
     label: "CRM",
     items: [
       { href: "/customers", icon: Building2, label: "Customers" },
-      { href: "/pipeline", icon: TrendingUp, label: "Pipeline" },
+      { href: "/workflow", icon: TrendingUp, label: "Workflow" },
     ],
   },
   {
@@ -81,11 +81,11 @@ function SidebarItem({ href, icon: Icon, label, collapsed, active }: SidebarItem
 
 const RESTRICTED_ROUTES: Record<string, string[]> = {
   sales_manager: ["/projects", "/tasks", "/settings/billing"],
-  project_manager: ["/leads", "/customers", "/pipeline", "/settings/billing"],
+  project_manager: ["/leads", "/customers", "/workflow", "/settings/billing"],
   team_member: [
     "/leads",
     "/customers",
-    "/pipeline",
+    "/workflow",
     "/settings/organization",
     "/settings/members",
     "/settings/billing",

@@ -240,8 +240,8 @@ function TableView({ deals }: { deals: Deal[] }) {
   );
 }
 
-// ── Main Pipeline ─────────────────────────────────────────────
-export default function PipelinePage() {
+// ── Main Workflow ─────────────────────────────────────────────
+export default function WorkflowPage() {
   const [view, setView] = useState<"kanban" | "table">("kanban");
   const [deals, setDeals] = useState(mockDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -288,7 +288,7 @@ export default function PipelinePage() {
       {/* Header */}
       <div className="page-header mb-4">
         <div>
-          <h1 className="page-title">Pipeline</h1>
+          <h1 className="page-title">Workflow</h1>
           <p className="text-[13px] text-[var(--foreground-muted)] mt-0.5">
             {formatCurrency(totalPipelineValue)} weighted forecast · {deals.filter((d) => !d.isWon && !d.isLost).length} active deals
           </p>

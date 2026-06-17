@@ -86,7 +86,7 @@ export function NewDealSheet({ open, onClose }: NewDealSheetProps) {
             </div>
             <div>
               <h2 className="text-[14px] font-semibold text-[var(--foreground)]">New Deal</h2>
-              <p className="text-[11.5px] text-[var(--foreground-muted)]">Add to pipeline</p>
+              <p className="text-[11.5px] text-[var(--foreground-muted)]">Add to workflow</p>
             </div>
           </div>
           <button
@@ -139,7 +139,7 @@ export function NewDealSheet({ open, onClose }: NewDealSheetProps) {
             {/* Stage */}
             <div>
               <label className="block text-[12px] font-medium text-[var(--foreground-muted)] mb-1.5">
-                Pipeline Stage
+                Workflow Stage
               </label>
               <div className="relative">
                 <select

@@ -145,7 +145,7 @@ export function ReportsSheet({ open, onClose }: ReportsSheetProps) {
               <p className="text-[18px] font-bold text-[var(--foreground)] mt-1">{mockProjects.length}</p>
             </div>
             <div className="text-center">
-              <p className="text-[11px] text-[var(--foreground-subtle)] font-medium uppercase tracking-wider">Leads Pipeline</p>
+              <p className="text-[11px] text-[var(--foreground-subtle)] font-medium uppercase tracking-wider">Leads Workflow</p>
               <p className="text-[18px] font-bold text-[#22c55e] mt-1">
                 {formatCurrency(leads.reduce((s, l) => s + l.value, 0))}
               </p>
