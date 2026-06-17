@@ -405,7 +405,10 @@ function StaffShiftsPanel({
     staffHours[s.userId].active = true;
   });
 
-  const staffList = Object.values(staffHours);
+  const staffList = Object.values(staffHours).filter((staff) => {
+    const userObj = mockUsers.find((u) => u.id === staff.userId);
+    return userObj?.role !== "owner";
+  });
 
   return (
     <div
@@ -570,7 +573,7 @@ export function AppHeader() {
                   )}
                   title="View Staff Shifts"
                 >
-                  {activeShifts.length > 0 ? (
+                  {activeShifts.filter(s => mockUsers.find(u => u.id === s.userId)?.role !== "owner").length > 0 ? (
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>

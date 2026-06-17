@@ -627,7 +627,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {mockUsers
-              .filter((u) => u.id !== user?.id)
+              .filter((u) => u.role !== "owner" && u.id !== user?.id)
               .map((u) => {
                 const totalWorkSeconds = shifts.filter(s => s.userId === u.id).reduce((acc, s) => acc + s.durationSeconds, 0);
                 const hrs = Math.floor(totalWorkSeconds / 3600);
@@ -678,13 +678,13 @@ export default function DashboardPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
             </span>
-            {activeShifts.length} Working Now
+            {activeShifts.filter(s => mockUsers.find(u => u.id === s.userId)?.role !== "owner").length} Working Now
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {mockUsers
-            .filter((u) => u.id !== user?.id) // Show everyone except the current user
+            .filter((u) => u.role !== "owner" && u.id !== user?.id) // Show everyone except owners and the current user
             .map((u) => {
               const activeShift = activeShifts.find((s) => s.userId === u.id);
               const isWorking = !!activeShift;
