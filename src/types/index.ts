@@ -400,3 +400,20 @@ export interface Shift {
   durationSeconds: number;
   isCompleted: boolean;
 }
+
+// ─── CRM Chat Types ───────────────────────────────────────────
+export interface PingedEntity {
+  type: "lead" | "project" | "deal" | "task";
+  id: string;
+  name: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  recipientId?: string; // If undefined, it is a public channel message
+  content: string;
+  timestamp: string; // ISO string
+  pingedEntities?: PingedEntity[];
+}

@@ -16,10 +16,12 @@ import {
   Plus,
   Building2,
   Target,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
+import { useChatStore } from "@/stores/chat.store";
 import { getInitials } from "@/lib/utils";
 import { NewDealSheet } from "@/components/shared/new-deal-sheet";
 
@@ -29,6 +31,7 @@ const navGroups = [
     items: [
       { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
       { href: "/leads", icon: Target, label: "Leads" },
+      { href: "#chat", icon: MessageSquare, label: "Chat" },
       { href: "/activity", icon: Activity, label: "Activity" },
     ],
   },
@@ -60,9 +63,26 @@ interface SidebarItemProps {
   label: string;
   collapsed: boolean;
   active: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
-function SidebarItem({ href, icon: Icon, label, collapsed, active }: SidebarItemProps) {
+function SidebarItem({ href, icon: Icon, label, collapsed, active, onClick }: SidebarItemProps) {
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className={cn(
+          "sos-sidebar-item w-full text-left cursor-pointer",
+          active && "active",
+          collapsed && "justify-center px-2"
+        )}
+        title={collapsed ? label : undefined}
+      >
+        <Icon size={16} className="flex-shrink-0" />
+        {!collapsed && <span className="truncate">{label}</span>}
+      </button>
+    );
+  }
   return (
     <Link
       href={href}
@@ -96,6 +116,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, sidebarOpen, toggleSidebar } = useUIStore();
   const { user, organization } = useAuthStore();
+  const { isOpen: chatIsOpen, setIsOpen: setChatIsOpen } = useChatStore();
   const [newDealOpen, setNewDealOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -210,14 +231,21 @@ export function AppSidebar() {
                 </p>
               )}
               <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <SidebarItem
-                    key={item.href}
-                    {...item}
-                    collapsed={collapsed}
-                    active={isActive(item.href)}
-                  />
-                ))}
+                {group.items.map((item) => {
+                  const isChat = item.href === "#chat";
+                  return (
+                    <SidebarItem
+                      key={item.href}
+                      {...item}
+                      collapsed={collapsed}
+                      active={isChat ? chatIsOpen : isActive(item.href)}
+                      onClick={isChat ? (e) => {
+                        e.preventDefault();
+                        setChatIsOpen(true);
+                      } : undefined}
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}

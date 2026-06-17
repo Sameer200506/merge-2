@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
 import { CommandPalette } from "@/components/layout/command-palette";
+import { ChatDrawer } from "@/components/shared/chat-drawer";
 
 export default function DashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default function DashboardLayout({
         </main>
       </div>
       <CommandPalette />
+      <ChatDrawer />
     </div>
   );
 }
