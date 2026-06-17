@@ -5,13 +5,18 @@ try {
   console.log("🔄 Starting Upstream Sync...");
   console.log("------------------------------------------");
 
-  // 1. Add upstream remote (ignore error if it already exists)
+  // 1. Add upstream remote (ignore error if it already exists and update it)
   console.log("🔹 Configuring upstream remote...");
   try {
-    execSync("git remote add upstream https://github.com/Eaglefang1107/super-spork.git", { stdio: "ignore" });
+    execSync("git remote add upstream https://github.com/kokkushivank05-tech/shiny-doodle.git", { stdio: "ignore" });
     console.log("✅ Upstream remote configured successfully.");
   } catch (e) {
-    console.log("ℹ️ Upstream remote already configured.");
+    try {
+      execSync("git remote set-url upstream https://github.com/kokkushivank05-tech/shiny-doodle.git", { stdio: "ignore" });
+      console.log("✅ Upstream remote URL updated.");
+    } catch (err) {
+      console.log("ℹ️ Upstream remote already configured.");
+    }
   }
 
   // 2. Fetch upstream main branch

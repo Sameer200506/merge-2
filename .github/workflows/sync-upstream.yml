@@ -26,7 +26,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Add upstream remote
-        run: git remote add upstream https://github.com/Eaglefang1107/super-spork.git || true
+        run: git remote add upstream https://github.com/kokkushivank05-tech/shiny-doodle.git || git remote set-url upstream https://github.com/kokkushivank05-tech/shiny-doodle.git
 
       - name: Fetch upstream
         run: git fetch upstream main
