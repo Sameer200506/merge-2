@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ChatMessage, PingedEntity } from "@/types";
+import { isFirebaseConfigured, db } from "@/lib/firebase";
+import { collection, doc, setDoc } from "firebase/firestore";
 
 interface ActiveChannel {
   type: "public" | "private";
@@ -16,6 +18,7 @@ interface ChatState {
   // Actions
   setIsOpen: (open: boolean) => void;
   setActiveChannel: (channel: ActiveChannel) => void;
+  setMessages: (messages: ChatMessage[]) => void;
   sendMessage: (
     senderId: string,
     senderName: string,
@@ -122,25 +125,47 @@ export const useChatStore = create<ChatState>()(
 
       setIsOpen: (open) => set({ isOpen: open }),
       setActiveChannel: (channel) => set({ activeChannel: channel }),
+      setMessages: (messages) => set({ messages }),
 
       sendMessage: (senderId, senderName, content, recipientId, pingedEntities) => {
-        set((state) => {
-          const newMessage: ChatMessage = {
-            id: `msg_${Date.now()}`,
-            senderId,
-            senderName,
-            recipientId,
-            content,
-            timestamp: new Date().toISOString(),
-            pingedEntities,
+        const newMessage = {
+          senderId,
+          senderName,
+          recipientId: recipientId || null,
+          content,
+          timestamp: new Date().toISOString(),
+          pingedEntities: pingedEntities || null,
+        };
+
+        if (isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              const docRef = doc(collection(db, "chats"));
+              await setDoc(docRef, { ...newMessage, id: docRef.id });
+            } catch (e) {
+              console.error("Firestore sendMessage error:", e);
+            }
           };
-          return {
-            messages: [...state.messages, newMessage],
-          };
-        });
+          runAsync();
+          return;
+        }
+
+        // Local fallback
+        set((state) => ({
+          messages: [
+            ...state.messages,
+            { ...newMessage, id: `msg_${Date.now()}` } as ChatMessage,
+          ],
+        }));
       },
 
-      clearMessages: () => set({ messages: [] }),
+      clearMessages: () => {
+        if (isFirebaseConfigured && db) {
+          // Typically we wouldn't delete all from Firestore in UI, 
+          // but we can clear local state representation
+        }
+        set({ messages: [] });
+      },
     }),
     {
       name: "startupos-chat-store",

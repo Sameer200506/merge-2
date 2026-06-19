@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Shift } from "@/types";
+import { isFirebaseConfigured, db } from "@/lib/firebase";
+import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 
 const INITIAL_MOCK_SHIFTS: Shift[] = [
   {
@@ -69,6 +71,8 @@ interface ShiftsState {
   // Actions
   clockIn: (userId: string) => void;
   clockOut: (userId: string) => void;
+  setActiveShifts: (activeShifts: Shift[]) => void;
+  setShifts: (shifts: Shift[]) => void;
   tick: () => void;
   clearHistory: () => void;
 }
@@ -79,25 +83,66 @@ export const useShiftsStore = create<ShiftsState>()(
       activeShifts: [],
       shifts: INITIAL_MOCK_SHIFTS,
 
-      clockIn: (userId: string) => {
-        set((state) => {
-          // Prevent double clock-in
-          if (state.activeShifts.some((s) => s.userId === userId)) return {};
-          
-          const newShift: Shift = {
-            id: `shift_${Date.now()}`,
-            userId,
-            startTime: new Date().toISOString(),
-            durationSeconds: 0,
-            isCompleted: false,
+      setActiveShifts: (activeShifts) => set({ activeShifts }),
+      setShifts: (shifts) => set({ shifts }),
+
+      clockIn: (userId) => {
+        const newShift: Shift = {
+          id: `shift_${Date.now()}`,
+          userId,
+          startTime: new Date().toISOString(),
+          durationSeconds: 0,
+          isCompleted: false,
+        };
+
+        if (isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              // Doc ID matches userId to prevent double clock-in
+              await setDoc(doc(db, "activeShifts", userId), newShift);
+            } catch (e) {
+              console.error("Firestore clockIn error:", e);
+            }
           };
+          runAsync();
+          return;
+        }
+
+        // Local fallback
+        set((state) => {
+          if (state.activeShifts.some((s) => s.userId === userId)) return {};
           return {
             activeShifts: [...state.activeShifts, newShift],
           };
         });
       },
 
-      clockOut: (userId: string) => {
+      clockOut: (userId) => {
+        if (isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              const active = useShiftsStore.getState().activeShifts.find((s) => s.userId === userId);
+              if (!active) return;
+
+              const completedShift: Shift = {
+                ...active,
+                endTime: new Date().toISOString(),
+                isCompleted: true,
+              };
+
+              // Write completed shift log to shifts history
+              await setDoc(doc(collection(db, "shifts")), completedShift);
+              // Delete active shift record
+              await deleteDoc(doc(db, "activeShifts", userId));
+            } catch (e) {
+              console.error("Firestore clockOut error:", e);
+            }
+          };
+          runAsync();
+          return;
+        }
+
+        // Local fallback
         set((state) => {
           const active = state.activeShifts.find((s) => s.userId === userId);
           if (!active) return {};
@@ -117,10 +162,16 @@ export const useShiftsStore = create<ShiftsState>()(
 
       tick: () => {
         set((state) => ({
-          activeShifts: state.activeShifts.map((s) => ({
-            ...s,
-            durationSeconds: s.durationSeconds + 1,
-          })),
+          activeShifts: state.activeShifts.map((s) => {
+            // Re-calculate elapsed seconds using startTime for exact accuracy
+            const elapsed = Math.floor(
+              (Date.now() - new Date(s.startTime).getTime()) / 1000
+            );
+            return {
+              ...s,
+              durationSeconds: elapsed >= 0 ? elapsed : s.durationSeconds + 1,
+            };
+          }),
         }));
       },
 

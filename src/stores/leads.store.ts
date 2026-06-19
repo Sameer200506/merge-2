@@ -2,10 +2,13 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Lead, LeadStatus, LeadSource } from "@/types";
+import type { Lead, LeadStatus } from "@/types";
+import { isFirebaseConfigured, db } from "@/lib/firebase";
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 
 interface LeadsState {
   leads: Lead[];
+  setLeads: (leads: Lead[]) => void;
   addLead: (lead: Omit<Lead, "id" | "organizationId" | "createdBy" | "updatedBy" | "createdAt" | "updatedAt">) => void;
   importLeads: (leads: Omit<Lead, "id" | "organizationId" | "createdBy" | "updatedBy" | "createdAt" | "updatedAt">[]) => void;
   updateLeadStatus: (id: string, status: LeadStatus) => void;
@@ -100,41 +103,124 @@ export const useLeadsStore = create<LeadsState>()(
     (set) => ({
       leads: INITIAL_MOCK_LEADS,
 
-      addLead: (leadData) => set((state) => {
-        const newLead: Lead = {
+      setLeads: (leads) => set({ leads }),
+
+      addLead: (leadData) => {
+        const newLead = {
           ...leadData,
-          id: `lead_${Math.random().toString(36).substr(2, 9)}`,
           organizationId: "org_1",
           createdBy: "user_1",
           updatedBy: "user_1",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        return { leads: [newLead, ...state.leads] };
-      }),
 
-      importLeads: (newLeadsData) => set((state) => {
-        const parsedLeads: Lead[] = newLeadsData.map((leadData, index) => ({
-          ...leadData,
-          id: `lead_imported_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
-          organizationId: "org_1",
-          createdBy: "user_1",
-          updatedBy: "user_1",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+        if (isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              const docRef = doc(collection(db, "leads"));
+              await setDoc(docRef, { ...newLead, id: docRef.id });
+            } catch (e) {
+              console.error("Firestore addLead error:", e);
+            }
+          };
+          runAsync();
+          return;
+        }
+
+        // Local fallback
+        set((state) => {
+          const leadWithId: Lead = {
+            ...newLead,
+            id: `lead_${Math.random().toString(36).substr(2, 9)}`,
+          };
+          return { leads: [leadWithId, ...state.leads] };
+        });
+      },
+
+      importLeads: (newLeadsData) => {
+        if (isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              const batch = writeBatch(db);
+              newLeadsData.forEach((leadData) => {
+                const docRef = doc(collection(db, "leads"));
+                const newLead = {
+                  ...leadData,
+                  id: docRef.id,
+                  organizationId: "org_1",
+                  createdBy: "user_1",
+                  updatedBy: "user_1",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                };
+                batch.set(docRef, newLead);
+              });
+              await batch.commit();
+            } catch (e) {
+              console.error("Firestore importLeads error:", e);
+            }
+          };
+          runAsync();
+          return;
+        }
+
+        // Local fallback
+        set((state) => {
+          const parsedLeads: Lead[] = newLeadsData.map((leadData, index) => ({
+            ...leadData,
+            id: `lead_imported_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
+            organizationId: "org_1",
+            createdBy: "user_1",
+            updatedBy: "user_1",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }));
+          return { leads: [...parsedLeads, ...state.leads] };
+        });
+      },
+
+      updateLeadStatus: (id, status) => {
+        if (isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              const docRef = doc(db, "leads", id);
+              await updateDoc(docRef, { status, updatedAt: new Date().toISOString() });
+            } catch (e) {
+              console.error("Firestore updateLeadStatus error:", e);
+            }
+          };
+          runAsync();
+          return;
+        }
+
+        // Local fallback
+        set((state) => ({
+          leads: state.leads.map((l) =>
+            l.id === id ? { ...l, status, updatedAt: new Date().toISOString() } : l
+          ),
         }));
-        return { leads: [...parsedLeads, ...state.leads] };
-      }),
+      },
 
-      updateLeadStatus: (id, status) => set((state) => ({
-        leads: state.leads.map((l) =>
-          l.id === id ? { ...l, status, updatedAt: new Date().toISOString() } : l
-        ),
-      })),
+      deleteLead: (id) => {
+        if (isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              const docRef = doc(db, "leads", id);
+              await deleteDoc(docRef);
+            } catch (e) {
+              console.error("Firestore deleteLead error:", e);
+            }
+          };
+          runAsync();
+          return;
+        }
 
-      deleteLead: (id) => set((state) => ({
-        leads: state.leads.filter((l) => l.id !== id),
-      })),
+        // Local fallback
+        set((state) => ({
+          leads: state.leads.filter((l) => l.id !== id),
+        }));
+      },
     }),
     {
       name: "startupos-leads",

@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { useUIStore } from "@/stores/ui.store";
 
+import { FirebaseSync } from "@/components/shared/firebase-sync";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 60 * 1000, refetchOnWindowFocus: false },
@@ -32,6 +34,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         {children}
+        <FirebaseSync />
         <Toaster
           position="bottom-right"
           richColors
