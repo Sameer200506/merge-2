@@ -2,16 +2,19 @@
 
 import { useEffect } from "react";
 import { isFirebaseConfigured, db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
 import { useLeadsStore } from "@/stores/leads.store";
 import { useChatStore } from "@/stores/chat.store";
 import { useShiftsStore } from "@/stores/shifts.store";
+import { useAuthStore } from "@/stores/auth.store";
 import type { Lead, ChatMessage, Shift } from "@/types";
+import { toast } from "sonner";
 
 export function FirebaseSync() {
   const { setLeads } = useLeadsStore();
   const { setMessages } = useChatStore();
   const { setActiveShifts, setShifts } = useShiftsStore();
+  const { user, sessionId, logout } = useAuthStore();
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
@@ -26,7 +29,6 @@ export function FirebaseSync() {
         snapshot.forEach((doc) => {
           leadsList.push({ id: doc.id, ...doc.data() } as Lead);
         });
-        // Sort leads by created time descending
         leadsList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setLeads(leadsList);
       },
@@ -82,16 +84,39 @@ export function FirebaseSync() {
       }
     );
 
+    // 5. Sync Session Lock (Prevent Concurrent Logins)
+    let unsubscribeSession = () => {};
+    if (user && sessionId) {
+      unsubscribeSession = onSnapshot(
+        doc(db, "sessions", user.id),
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            if (data.sessionId && data.sessionId !== sessionId) {
+              console.warn("⚠️ Device session conflict detected. Logging out...");
+              logout();
+              toast.error("Session Terminated: This account has been logged in from another device.", {
+                duration: 6000,
+              });
+            }
+          }
+        },
+        (error) => {
+          console.error("Firestore session lock sync error:", error);
+        }
+      );
+    }
+
     // Cleanup listeners on unmount
     return () => {
       unsubscribeLeads();
       unsubscribeChats();
       unsubscribeActiveShifts();
       unsubscribeShifts();
+      unsubscribeSession();
       console.log("🛑 Firebase Sync listeners closed.");
     };
-  }, [setLeads, setMessages, setActiveShifts, setShifts]);
+  }, [setLeads, setMessages, setActiveShifts, setShifts, user, sessionId, logout]);
 
-  // This is a utility sync component, it has no UI render output.
   return null;
 }

@@ -2,8 +2,10 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User, Organization, UserRole } from "@/types";
+import type { User, Organization } from "@/types";
 import { mockUsers } from "@/lib/mock-data";
+import { isFirebaseConfigured, db } from "@/lib/firebase";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
 
 const MOCK_ORG: Organization = {
   id: "org_1",
@@ -25,6 +27,7 @@ interface AuthState {
   organization: Organization | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  sessionId: string | null;
   // Actions
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -34,11 +37,12 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       organization: null,
       isAuthenticated: false,
       isLoading: false,
+      sessionId: null,
 
       login: async (email: string, _password: string) => {
         set({ isLoading: true });
@@ -48,11 +52,44 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: false });
           throw new Error("Invalid email. Please use a mock employee email.");
         }
-        set({ user: found, organization: MOCK_ORG, isAuthenticated: true, isLoading: false });
+
+        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        if (isFirebaseConfigured && db) {
+          try {
+            await setDoc(doc(db, "sessions", found.id), {
+              userId: found.id,
+              sessionId: newSessionId,
+              lastActive: new Date().toISOString(),
+            });
+          } catch (e) {
+            console.error("Firestore session login write error:", e);
+          }
+        }
+
+        set({
+          user: found,
+          organization: MOCK_ORG,
+          isAuthenticated: true,
+          isLoading: false,
+          sessionId: newSessionId,
+        });
       },
 
       logout: () => {
-        set({ user: null, organization: null, isAuthenticated: false });
+        const { user } = get();
+        if (user && isFirebaseConfigured && db) {
+          const runAsync = async () => {
+            try {
+              await deleteDoc(doc(db, "sessions", user.id));
+            } catch (e) {
+              console.error("Firestore session logout delete error:", e);
+            }
+          };
+          runAsync();
+        }
+
+        set({ user: null, organization: null, isAuthenticated: false, sessionId: null });
       },
 
       setUser: (user) => set({ user }),
@@ -64,6 +101,7 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         organization: state.organization,
         isAuthenticated: state.isAuthenticated,
+        sessionId: state.sessionId,
       }),
     }
   )
