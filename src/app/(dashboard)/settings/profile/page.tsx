@@ -1,22 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, Save } from "lucide-react";
+import { Camera, Save, CreditCard } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import { toast } from "sonner";
 
 export default function ProfileSettingsPage() {
-  const { user } = useAuthStore();
+  const { user, updatePaypalEmail } = useAuthStore();
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
+  const [paypalEmail, setPaypalEmail] = useState(user?.paypalEmail ?? "");
   const [saving, setSaving] = useState(false);
+  const [savingPaypal, setSavingPaypal] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 800));
     setSaving(false);
     toast.success("Profile updated successfully");
+  };
+
+  const handleSavePaypal = async () => {
+    if (!paypalEmail.trim()) {
+      toast.error("Please enter a valid PayPal email address");
+      return;
+    }
+    setSavingPaypal(true);
+    await new Promise((r) => setTimeout(r, 800));
+    updatePaypalEmail(paypalEmail.trim());
+    setSavingPaypal(false);
+    toast.success("PayPal email saved successfully");
   };
 
   return (
@@ -113,6 +127,54 @@ export default function ProfileSettingsPage() {
         </div>
         <div className="mt-4 flex justify-end">
           <button className="sos-btn sos-btn-outline">Update Password</button>
+        </div>
+      </div>
+
+      {/* PayPal Payment Settings */}
+      <div className="sos-card p-5">
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, #003087 0%, #009cde 100%)" }}>
+            <CreditCard size={13} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Payment Settings</h2>
+            <p className="text-[11px] text-[var(--foreground-muted)]">Your PayPal email is used to receive payments from the owner</p>
+          </div>
+        </div>
+
+        {user?.paypalEmail && (
+          <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(0, 156, 222, 0.08)", border: "1px solid rgba(0, 156, 222, 0.2)" }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[12px] text-[var(--foreground-muted)]">
+              Current PayPal email: <strong className="text-[var(--foreground)]">{user.paypalEmail}</strong>
+            </span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--foreground-muted)] mb-1.5">PayPal Email Address</label>
+            <input
+              value={paypalEmail}
+              onChange={(e) => setPaypalEmail(e.target.value)}
+              type="email"
+              placeholder="your-email@paypal.com"
+              className="sos-input"
+            />
+            <p className="text-[11px] text-[var(--foreground-muted)] mt-1.5">
+              Payments from your employer will be sent to this email via PayPal.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={handleSavePaypal}
+            disabled={savingPaypal}
+            className="sos-btn sos-btn-primary"
+          >
+            <Save size={13} />
+            {savingPaypal ? "Saving..." : "Save PayPal Email"}
+          </button>
         </div>
       </div>
     </div>

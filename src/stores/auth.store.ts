@@ -33,6 +33,7 @@ interface AuthState {
   logout: () => void;
   setUser: (user: User) => void;
   setOrganization: (org: Organization) => void;
+  updatePaypalEmail: (email: string) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -94,6 +95,10 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user) => set({ user }),
       setOrganization: (organization) => set({ organization }),
+      updatePaypalEmail: (email) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, paypalEmail: email } : null,
+        })),
     }),
     {
       name: "startupos-auth",

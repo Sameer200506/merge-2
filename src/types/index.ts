@@ -49,6 +49,7 @@ export interface User extends BaseEntity {
   role: UserRole;
   isActive: boolean;
   lastSeenAt?: string;
+  paypalEmail?: string;
   notificationPreferences: NotificationPreferences;
 }
 
@@ -416,4 +417,30 @@ export interface ChatMessage {
   content: string;
   timestamp: string; // ISO string
   pingedEntities?: PingedEntity[];
+}
+
+// ─── Payments ─────────────────────────────────────────────────
+export type PaymentStatus =
+  | "pending"
+  | "initiated"
+  | "processing"
+  | "paid"
+  | "failed";
+
+export interface Payment {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeRole: string;
+  paypalEmail: string;
+  periodStart: string;  // ISO string
+  periodEnd: string;    // ISO string
+  totalHours: number;
+  hourlyRate: number;
+  totalAmount: number;
+  status: PaymentStatus;
+  initiatedAt?: string; // ISO string
+  paidAt?: string;      // ISO string
+  note?: string;
+  transactionId?: string;
 }

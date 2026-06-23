@@ -17,6 +17,7 @@ import {
   Building2,
   Target,
   MessageSquare,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui.store";
@@ -25,37 +26,8 @@ import { useChatStore } from "@/stores/chat.store";
 import { getInitials } from "@/lib/utils";
 import { NewDealSheet } from "@/components/shared/new-deal-sheet";
 
-const navGroups = [
-  {
-    label: "Workspace",
-    items: [
-      { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/leads", icon: Target, label: "Leads" },
-      { href: "#chat", icon: MessageSquare, label: "Chat" },
-      { href: "/activity", icon: Activity, label: "Activity" },
-    ],
-  },
-  {
-    label: "CRM",
-    items: [
-      { href: "/customers", icon: Building2, label: "Customers" },
-      { href: "/workflow", icon: TrendingUp, label: "Workflow" },
-    ],
-  },
-  {
-    label: "Delivery",
-    items: [
-      { href: "/projects", icon: FolderKanban, label: "Projects" },
-      { href: "/tasks", icon: CheckSquare, label: "Tasks" },
-    ],
-  },
-  {
-    label: "Platform",
-    items: [
-      { href: "/settings", icon: Settings, label: "Settings" },
-    ],
-  },
-];
+
+
 
 interface SidebarItemProps {
   href: string;
@@ -132,7 +104,43 @@ export function AppSidebar() {
 
   const showNewDeal = user?.role === "owner" || user?.role === "sales_manager";
 
-  const visibleNavGroups = navGroups.map((group) => {
+  // Dynamic nav groups — Payments href differs by role
+  const paymentsHref = user?.role === "owner" ? "/payments" : "/payments/status";
+
+  const allNavGroups = [
+    {
+      label: "Workspace",
+      items: [
+        { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+        { href: "/leads", icon: Target, label: "Leads" },
+        { href: "#chat", icon: MessageSquare, label: "Chat" },
+        { href: "/activity", icon: Activity, label: "Activity" },
+      ],
+    },
+    {
+      label: "CRM",
+      items: [
+        { href: "/customers", icon: Building2, label: "Customers" },
+        { href: "/workflow", icon: TrendingUp, label: "Workflow" },
+      ],
+    },
+    {
+      label: "Delivery",
+      items: [
+        { href: "/projects", icon: FolderKanban, label: "Projects" },
+        { href: "/tasks", icon: CheckSquare, label: "Tasks" },
+      ],
+    },
+    {
+      label: "Platform",
+      items: [
+        { href: paymentsHref, icon: Wallet, label: "Payments" },
+        { href: "/settings", icon: Settings, label: "Settings" },
+      ],
+    },
+  ];
+
+  const visibleNavGroups = allNavGroups.map((group) => {
     const visibleItems = group.items.filter((item) => {
       if (user) {
         const roleRestrictions = RESTRICTED_ROUTES[user.role] || [];
@@ -145,10 +153,13 @@ export function AppSidebar() {
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/" || pathname === "/dashboard";
+    // Both /payments and /payments/status should match the /payments prefix
+    if (href === "/payments" || href === "/payments/status") return pathname.startsWith("/payments");
     return pathname.startsWith(href);
   };
 
   const collapsed = !mounted ? true : (!isMobile && sidebarCollapsed && !isHovered);
+
 
   // Close sidebar on mobile when navigating
   useEffect(() => {
