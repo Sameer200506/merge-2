@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, X, Folder, FileText, Tag, User, ArrowRight } from "lucide-react";
+import { Search, X, Folder, FileText, Tag, User, ArrowRight, Palette, Paperclip } from "lucide-react";
 import { useKnowledgeStore } from "@/stores/knowledge.store";
 import { getUserById } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ interface SearchModalProps {
 
 interface SearchResult {
   id: string;
-  type: "document" | "space";
+  type: "document" | "space" | "whiteboard" | "file";
   title: string;
   subtitle: string;
   url: string;
@@ -49,7 +49,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
     const term = query.toLowerCase().trim();
 
     // 1. Search Spaces
-    const matchedSpaces: SearchResult[] = spaces
+    const matchedSpaces: SearchResult[] & { docType?: string } = spaces
       .filter((s) => !s.isArchived && (s.name.toLowerCase().includes(term) || s.description?.toLowerCase().includes(term)))
       .map((s) => ({
         id: s.id,
@@ -70,8 +70,22 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         const space = spaces.find((s) => s.id === d.spaceId);
         const spaceName = space ? space.name.toLowerCase() : "";
         
+        // Extract whiteboard text objects if applicable
+        let whiteboardText = "";
+        if (d.type === "whiteboard" && d.canvasData) {
+          try {
+            const shapes = JSON.parse(d.canvasData);
+            if (Array.isArray(shapes)) {
+              whiteboardText = shapes
+                .filter((s) => s.type === "text" && s.text)
+                .map((s) => s.text)
+                .join(" ");
+            }
+          } catch (e) {}
+        }
+
         const matchTitle = d.title.toLowerCase().includes(term);
-        const matchContent = d.content.toLowerCase().includes(term);
+        const matchContent = d.content.toLowerCase().includes(term) || whiteboardText.toLowerCase().includes(term);
         const matchTags = d.tags.some((t) => t.toLowerCase().includes(term));
         const matchAuthor = authorName.includes(term);
         const matchSpace = spaceName.includes(term);
@@ -82,24 +96,53 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         const space = spaces.find((s) => s.id === d.spaceId);
         const author = getUserById(d.authorId);
         
+        // Extract whiteboard text objects if applicable
+        let whiteboardText = "";
+        if (d.type === "whiteboard" && d.canvasData) {
+          try {
+            const shapes = JSON.parse(d.canvasData);
+            if (Array.isArray(shapes)) {
+              whiteboardText = shapes
+                .filter((s) => s.type === "text" && s.text)
+                .map((s) => s.text)
+                .join(" ");
+            }
+          } catch (e) {}
+        }
+
         // Build plain text snippet/excerpt
-        const plainText = d.content.replace(/<[^>]*>/g, " ");
+        const rawBody = (d.type === "whiteboard" ? whiteboardText : d.content);
+        const plainText = rawBody.replace(/<[^>]*>/g, " ");
         const index = plainText.toLowerCase().indexOf(term);
+        
         let excerpt = "";
         if (index !== -1) {
           const start = Math.max(0, index - 30);
           const end = Math.min(plainText.length, index + 70);
-          excerpt = (start > 0 ? "..." : "") + plainText.substring(start, end).trim() + (end < plainText.length ? "..." : "");
+          const beforeMatch = plainText.substring(start, index);
+          const matchText = plainText.substring(index, index + term.length);
+          const afterMatch = plainText.substring(index + term.length, end);
+          
+          excerpt = 
+            (start > 0 ? "..." : "") + 
+            beforeMatch + 
+            `<mark class="bg-amber-200 dark:bg-amber-950/70 text-slate-900 dark:text-amber-200 px-1 rounded font-bold">${matchText}</mark>` + 
+            afterMatch + 
+            (end < plainText.length ? "..." : "");
         } else {
-          excerpt = plainText.substring(0, 80).trim() + (plainText.length > 80 ? "..." : "");
+          const trunc = plainText.substring(0, 80).trim();
+          excerpt = trunc + (plainText.length > 80 ? "..." : "");
         }
+
+        // Differentiate type label for badges
+        const displayType = d.type || "document";
 
         return {
           id: d.id,
-          type: "document",
+          type: displayType as any,
           title: d.title,
           subtitle: `in ${space?.name || "Workspace"} · by ${author?.displayName || "Unknown"}`,
-          url: `/knowledge/space/${d.spaceId}/${d.id}`,
+          url: `/knowledge/space/${d.spaceId}/${d.id}?highlight=${encodeURIComponent(query)}`,
           tags: d.tags,
           authorName: author?.displayName,
           spaceName: space?.name || "Workspace",
@@ -180,6 +223,10 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                     <div className="w-8 h-8 rounded-lg bg-[var(--background-muted)] flex items-center justify-center flex-shrink-0 text-[var(--foreground-muted)]">
                       {res.type === "space" ? (
                         <Folder size={14} className="text-[#f59e0b]" />
+                      ) : res.type === "whiteboard" ? (
+                        <Palette size={14} className="text-purple-500" />
+                      ) : res.type === "file" ? (
+                        <Paperclip size={14} className="text-emerald-500" />
                       ) : (
                         <FileText size={14} className="text-[var(--primary)]" />
                       )}
@@ -199,9 +246,10 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
 
                       {/* Excerpt */}
                       {res.excerpt && (
-                        <p className="text-[12px] text-[var(--foreground-subtle)] bg-[var(--background-subtle)] p-1.5 rounded mt-1.5 italic font-mono truncate border border-[var(--border)]">
-                          {res.excerpt}
-                        </p>
+                        <p
+                          className="text-[12px] text-[var(--foreground-subtle)] bg-[var(--background-subtle)] p-1.5 rounded mt-1.5 italic font-mono truncate border border-[var(--border)]"
+                          dangerouslySetInnerHTML={{ __html: res.excerpt }}
+                        />
                       )}
 
                       {/* Tags */}

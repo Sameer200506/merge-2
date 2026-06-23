@@ -17,6 +17,7 @@ export interface Space extends BaseEntity {
 }
 
 export type DocumentStatus = "draft" | "published" | "archived";
+export type DocumentType = "document" | "whiteboard" | "file";
 
 export interface Document extends BaseEntity {
   title: string;
@@ -31,6 +32,15 @@ export interface Document extends BaseEntity {
   customerId?: ID;
   projectId?: ID;
   taskId?: ID;
+
+  // New properties for whiteboards, files, and Notion layouts
+  type?: DocumentType;
+  fileUrl?: string;
+  fileSize?: string;
+  fileType?: string;
+  canvasData?: string;
+  coverImage?: string;
+  icon?: string;
 }
 
 export interface DocumentVersion extends BaseEntity {

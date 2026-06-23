@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   X,
   FileDown,
+  Palette,
 } from "lucide-react";
 import { useKnowledgeStore, logKnowledgeActivity } from "@/stores/knowledge.store";
 import { useAuthStore } from "@/stores/auth.store";
@@ -30,6 +31,7 @@ import { SpaceSidebar } from "@/components/knowledge/space-sidebar";
 import { CommentsSidebar } from "@/components/knowledge/comments-sidebar";
 import { VersionHistorySidebar } from "@/components/knowledge/version-history";
 import { TipTapEditor } from "@/components/knowledge/tiptap-editor";
+import { WhiteboardCanvas } from "@/components/knowledge/whiteboard-canvas";
 import { SearchModal } from "@/components/knowledge/search-modal";
 import {
   mockCustomers,
@@ -50,6 +52,7 @@ export default function DocumentWorkspacePage({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const highlightQuery = searchParams.get("highlight");
   
   const { spaceId, docId } = use(params);
   
@@ -96,6 +99,46 @@ export default function DocumentWorkspacePage({
   ]);
   const [uploading, setUploading] = useState(false);
 
+  const COVER_PRESETS = [
+    "bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500",
+    "bg-gradient-to-r from-amber-200 via-red-300 to-pink-400",
+    "bg-gradient-to-r from-emerald-400 to-cyan-500",
+    "bg-gradient-to-r from-rose-400 via-fuchsia-500 to-indigo-500",
+    "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900",
+  ];
+
+  const EMOJI_PRESETS = ["📄", "💻", "💰", "🌱", "🎨", "🚀", "💡", "🧠", "🎯", "📝", "⚡", "🔒", "🌐"];
+
+  const handleChangeCover = async () => {
+    if (!currentUser || !docObj) return;
+    const currentCover = docObj.coverImage || COVER_PRESETS[0];
+    const currentIndex = COVER_PRESETS.indexOf(currentCover);
+    const nextIndex = (currentIndex + 1) % COVER_PRESETS.length;
+    const nextCover = COVER_PRESETS[nextIndex];
+
+    try {
+      await updateDocument(docObj.id, docObj.title, docObj.content, currentUser.id, { coverImage: nextCover }, "Updated cover picture");
+      toast.success("Cover theme changed!");
+    } catch (e) {
+      toast.error("Failed to change cover");
+    }
+  };
+
+  const handleChangeEmoji = async () => {
+    if (!currentUser || !docObj) return;
+    const currentEmoji = docObj.icon || EMOJI_PRESETS[0];
+    const currentIndex = EMOJI_PRESETS.indexOf(currentEmoji);
+    const nextIndex = (currentIndex + 1) % EMOJI_PRESETS.length;
+    const nextEmoji = EMOJI_PRESETS[nextIndex];
+
+    try {
+      await updateDocument(docObj.id, docObj.title, docObj.content, currentUser.id, { icon: nextEmoji }, "Updated page icon");
+      toast.success(`Icon changed to ${nextEmoji}!`);
+    } catch (e) {
+      toast.error("Failed to change icon");
+    }
+  };
+
   // Initialize fields on doc load or edit mode toggle
   useEffect(() => {
     if (docObj) {
@@ -117,6 +160,23 @@ export default function DocumentWorkspacePage({
       setIsEditing(true);
     }
   }, [searchParams]);
+
+  const getHighlightedContent = () => {
+    if (!docObj) return "";
+    const baseHtml = previewVersion ? previewVersion.content : docObj.content;
+    if (!highlightQuery) return baseHtml;
+
+    try {
+      const escaped = highlightQuery.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      const regex = new RegExp(`(${escaped})`, "gi");
+      // Replace only inside text nodes (ignoring HTML tags/attributes)
+      return baseHtml.replace(/>([^<]+)</g, (m, text) => {
+        return `>${text.replace(regex, `<mark class="bg-amber-200 px-0.5 rounded font-bold text-slate-900">$1</mark>`)}<`;
+      });
+    } catch (e) {
+      return baseHtml;
+    }
+  };
 
   if (!space || !docObj) {
     return (
@@ -297,12 +357,28 @@ export default function DocumentWorkspacePage({
           <div className="flex items-center gap-2">
             {!isEditing ? (
               <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="sos-btn sos-btn-outline py-1.5 px-3 text-[12px] cursor-pointer"
-                >
-                  <Pencil size={12} /> Edit Page
-                </button>
+                {docObj.type === "whiteboard" ? (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="sos-btn sos-btn-outline py-1.5 px-3 text-[12px] cursor-pointer"
+                  >
+                    <Pencil size={12} /> Rename Board
+                  </button>
+                ) : docObj.type === "file" ? (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="sos-btn sos-btn-outline py-1.5 px-3 text-[12px] cursor-pointer"
+                  >
+                    <Pencil size={12} /> Edit Details
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="sos-btn sos-btn-outline py-1.5 px-3 text-[12px] cursor-pointer"
+                  >
+                    <Pencil size={12} /> Edit Page
+                  </button>
+                )}
                 <button
                   onClick={() => setRightSidebar(rightSidebar === "comments" ? null : "comments")}
                   className={cn(
@@ -353,178 +429,272 @@ export default function DocumentWorkspacePage({
 
         {/* View Mode Workspace */}
         {!isEditing ? (
-          <div className="p-8 max-w-3xl mx-auto w-full flex-1 space-y-6">
-            
-            {/* Historical Preview banner */}
-            {previewVersion && (
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl flex items-center justify-between text-[12px] text-amber-800 dark:text-amber-300">
-                <p className="flex items-center gap-1.5 font-medium">
-                  <Eye size={14} /> Previewing revision #{previewVersion.versionNumber} (Saved {formatRelativeTime(previewVersion.timestamp)})
-                </p>
-                <button
-                  onClick={() => setPreviewVersion(null)}
-                  className="sos-btn bg-amber-200 hover:bg-amber-300 dark:bg-amber-900 dark:hover:bg-amber-800 text-[11px] py-1 px-2.5 rounded font-bold cursor-pointer"
-                >
-                  Exit Preview
-                </button>
-              </div>
-            )}
-
-            {/* Title / Meta */}
-            <div className="space-y-3 pb-5 border-b border-[var(--border)]">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={cn(
-                  "text-[10px] font-bold px-2 py-0.5 rounded-full select-none capitalize border",
-                  (previewVersion?.title ? docObj.status : docObj.status) === "published"
-                    ? "bg-green-50 text-[var(--success-foreground)] border-green-200 dark:bg-green-950/20"
-                    : "bg-amber-50 text-[var(--warning-foreground)] border-amber-200 dark:bg-amber-950/20"
-                )}>
-                  {previewVersion ? "Viewing Revision" : docObj.status}
-                </span>
-
-                {/* Highlight/Comment button */}
-                <button
-                  onClick={handleSelectTextComment}
-                  className="text-[10.5px] font-medium text-[var(--foreground-muted)] hover:text-[var(--primary)] border border-[var(--border)] px-2 py-0.5 rounded bg-[var(--background-subtle)] transition-colors cursor-pointer"
-                  title="Highlight text to review"
-                >
-                  💬 Comment on selection
-                </button>
-              </div>
-
-              <h1 className="text-[28px] font-extrabold text-[var(--foreground)] tracking-tight leading-tight">
-                {previewVersion ? previewVersion.title : docObj.title}
-              </h1>
-
-              {/* Author, Editor, Timestamps */}
-              <div className="flex items-center gap-4 text-[11.5px] text-[var(--foreground-subtle)] flex-wrap pt-1.5">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-4 h-4 rounded-full gradient-primary flex items-center justify-center text-[7.5px] font-bold text-white">
-                    {author ? getInitials(author.displayName) : "?"}
-                  </div>
-                  <span>
-                    Written by <strong>{author?.displayName || "Unknown"}</strong>
-                  </span>
+          docObj.type === "whiteboard" ? (
+            <div className="flex-1 p-6 flex flex-col min-h-[580px] h-full">
+              <WhiteboardCanvas
+                canvasData={docObj.canvasData}
+                onChange={async (data) => {
+                  if (currentUser) {
+                    await updateDocument(
+                      docObj.id,
+                      docObj.title,
+                      docObj.content,
+                      currentUser.id,
+                      { canvasData: data },
+                      "Updated drawing elements"
+                    );
+                  }
+                }}
+                spaceId={space.id}
+                spaceName={space.name}
+              />
+            </div>
+          ) : docObj.type === "file" ? (
+            <div className="p-8 max-w-3xl mx-auto w-full flex-1 space-y-6">
+              {/* File details card */}
+              <div className="sos-card p-6 border border-[var(--border)] rounded-2xl bg-[var(--card)] flex items-start gap-4 shadow-sm relative">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                  <Paperclip size={24} />
                 </div>
-                {editor && (
-                  <>
-                    <span className="opacity-40">•</span>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-[18px] font-bold text-[var(--foreground)] truncate">{docObj.title}</h2>
+                  <div className="flex items-center gap-3 mt-1.5 text-[12px] text-[var(--foreground-subtle)] font-medium">
+                    <span>Size: {docObj.fileSize || "Unknown"}</span>
+                    <span>•</span>
+                    <span>Type: {docObj.fileType || "Document"}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.success(`Mock download triggered for: ${docObj.title}`);
+                  }}
+                  className="sos-btn sos-btn-primary py-2 px-4 text-[12.5px] font-semibold flex items-center gap-1 cursor-pointer self-center"
+                >
+                  <FileDown size={14} /> Download File
+                </button>
+              </div>
+
+              {/* Text Index & Highlights */}
+              <div className="space-y-3">
+                <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--foreground-subtle)]">
+                  Extracted Search Index (OCR)
+                </h3>
+                <div className="p-5 border border-[var(--border)] rounded-2xl bg-[var(--background-subtle)] text-[14px] leading-relaxed font-mono whitespace-pre-wrap select-text max-h-[400px] overflow-y-auto">
+                  {highlightQuery ? (
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: docObj.content.replace(
+                          new RegExp(`(${highlightQuery.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, "gi"),
+                          '<mark class="bg-amber-200 px-0.5 rounded font-bold text-slate-900">$1</mark>'
+                        ),
+                      }}
+                    />
+                  ) : (
+                    docObj.content
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 max-w-3xl mx-auto w-full flex-1 space-y-6 animate-fade-in">
+              
+              {/* Historical Preview banner */}
+              {previewVersion && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl flex items-center justify-between text-[12px] text-amber-800 dark:text-amber-300">
+                  <p className="flex items-center gap-1.5 font-medium">
+                    <Eye size={14} /> Previewing revision #{previewVersion.versionNumber} (Saved {formatRelativeTime(previewVersion.timestamp)})
+                  </p>
+                  <button
+                    onClick={() => setPreviewVersion(null)}
+                    className="sos-btn bg-amber-200 hover:bg-amber-300 dark:bg-amber-900 dark:hover:bg-amber-800 text-[11px] py-1 px-2.5 rounded font-bold cursor-pointer"
+                  >
+                    Exit Preview
+                  </button>
+                </div>
+              )}
+
+              {/* Cover Image Banner (Notion style) */}
+              <div className={cn("h-40 rounded-2xl relative group overflow-hidden mt-1 flex items-center justify-center select-none shadow-xs border border-[var(--border)]", (docObj.coverImage || COVER_PRESETS[0]).startsWith("http") ? "" : (docObj.coverImage || COVER_PRESETS[0]))}>
+                {(docObj.coverImage || COVER_PRESETS[0]).startsWith("http") && (
+                  <img src={docObj.coverImage} className="object-cover w-full h-full" alt="Cover" />
+                )}
+                <button
+                  type="button"
+                  onClick={handleChangeCover}
+                  className="absolute right-3 bottom-3 bg-black/75 hover:bg-black text-white text-[10.5px] font-semibold py-1 px-2.5 rounded-lg border border-white/20 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                >
+                  Change Cover
+                </button>
+              </div>
+
+              {/* Page Emoji Icon (Notion style) */}
+              <div className="relative group w-fit -mt-12 mb-2 ml-4 z-10 select-none">
+                <div
+                  onClick={handleChangeEmoji}
+                  className="text-5xl bg-[var(--card)] p-2.5 rounded-2xl shadow-md border border-[var(--border)] cursor-pointer hover:bg-[var(--background-muted)] transition-all hover:scale-105"
+                  title="Change icon"
+                >
+                  {docObj.icon || "📄"}
+                </div>
+              </div>
+
+              {/* Title / Meta */}
+              <div className="space-y-3 pb-5 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={cn(
+                    "text-[10px] font-bold px-2 py-0.5 rounded-full select-none capitalize border",
+                    (previewVersion?.title ? docObj.status : docObj.status) === "published"
+                      ? "bg-green-50 text-[var(--success-foreground)] border-green-200 dark:bg-green-950/20"
+                      : "bg-amber-50 text-[var(--warning-foreground)] border-amber-200 dark:bg-amber-950/20"
+                  )}>
+                    {previewVersion ? "Viewing Revision" : docObj.status}
+                  </span>
+
+                  {/* Highlight/Comment button */}
+                  <button
+                    onClick={handleSelectTextComment}
+                    className="text-[10.5px] font-medium text-[var(--foreground-muted)] hover:text-[var(--primary)] border border-[var(--border)] px-2 py-0.5 rounded bg-[var(--background-subtle)] transition-colors cursor-pointer"
+                    title="Highlight text to review"
+                  >
+                    💬 Comment on selection
+                  </button>
+                </div>
+
+                <h1 className="text-[28px] font-extrabold text-[var(--foreground)] tracking-tight leading-tight">
+                  {previewVersion ? previewVersion.title : docObj.title}
+                </h1>
+
+                {/* Author, Editor, Timestamps */}
+                <div className="flex items-center gap-4 text-[11.5px] text-[var(--foreground-subtle)] flex-wrap pt-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded-full gradient-primary flex items-center justify-center text-[7.5px] font-bold text-white">
+                      {author ? getInitials(author.displayName) : "?"}
+                    </div>
                     <span>
-                      Last edited by <strong>{editor.displayName}</strong> on {formatDate(previewVersion ? previewVersion.timestamp : docObj.updatedAt)}
+                      Written by <strong>{author?.displayName || "Unknown"}</strong>
                     </span>
-                  </>
+                  </div>
+                  {editor && (
+                    <>
+                      <span className="opacity-40">•</span>
+                      <span>
+                        Last edited by <strong>{editor.displayName}</strong> on {formatDate(previewVersion ? previewVersion.timestamp : docObj.updatedAt)}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Tags */}
+                {docObj.tags.length > 0 && (
+                  <div className="flex items-center gap-1.5 pt-2 flex-wrap">
+                    {docObj.tags.map((t) => (
+                      <span
+                        key={t}
+                        className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 bg-[var(--background-subtle)] border border-[var(--border)] rounded-md text-[var(--foreground-muted)] font-medium font-mono"
+                      >
+                        #{t}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              {/* Tags */}
-              {docObj.tags.length > 0 && (
-                <div className="flex items-center gap-1.5 pt-2 flex-wrap">
-                  {docObj.tags.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 bg-[var(--background-subtle)] border border-[var(--border)] rounded-md text-[var(--foreground-muted)] font-medium font-mono"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+              {/* Document Content Render */}
+              <div
+                className="prose prose-slate dark:prose-invert max-w-none text-[14px] leading-relaxed select-text"
+                dangerouslySetInnerHTML={{
+                  __html: getHighlightedContent(),
+                }}
+              />
 
-            {/* Document Content Render */}
-            <div
-              className="prose prose-slate dark:prose-invert max-w-none text-[14px] leading-relaxed select-text"
-              dangerouslySetInnerHTML={{
-                __html: previewVersion ? previewVersion.content : docObj.content,
-              }}
-            />
-
-            {/* Linked Entities (CRM, Projects, Tasks) */}
-            {(linkedCustomer || linkedProject || linkedTask) && (
-              <div className="pt-6 border-t border-[var(--border)] space-y-2">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-subtle)]">
-                  Linked Integrations
-                </h4>
-                <div className="flex flex-wrap gap-2.5">
-                  {linkedCustomer && (
-                    <Link
-                      href={`/customers/${linkedCustomer.id}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border)] rounded-xl bg-[var(--background-subtle)] hover:bg-slate-100 hover:border-[var(--primary)] text-[12px] text-[var(--primary)] transition-all font-semibold"
-                    >
-                      <Building2 size={12} />
-                      <span>CRM: {linkedCustomer.name}</span>
-                      <ExternalLink size={9} />
-                    </Link>
-                  )}
-                  {linkedProject && (
-                    <Link
-                      href={`/projects/${linkedProject.id}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border)] rounded-xl bg-[var(--background-subtle)] hover:bg-slate-100 hover:border-[var(--primary)] text-[12px] text-[var(--primary)] transition-all font-semibold"
-                    >
-                      <FolderKanban size={12} />
-                      <span>Project: {linkedProject.name}</span>
-                      <ExternalLink size={9} />
-                    </Link>
-                  )}
-                  {linkedTask && (
-                    <div
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border)] rounded-xl bg-[var(--background-subtle)] text-[12px] text-[var(--foreground-muted)] font-semibold"
-                    >
-                      <CheckSquare size={12} />
-                      <span>Task: {linkedTask.title}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Attachments panel */}
-            <div className="pt-6 border-t border-[var(--border)] space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-subtle)] flex items-center gap-1">
-                  <Paperclip size={11} /> Page Attachments ({attachments.length})
-                </h4>
-                <button
-                  type="button"
-                  onClick={handleAttachmentUpload}
-                  disabled={uploading}
-                  className="text-[11.5px] font-bold text-[var(--primary)] hover:underline cursor-pointer"
-                >
-                  {uploading ? "Uploading..." : "+ Upload File"}
-                </button>
-              </div>
-
-              {attachments.length === 0 ? (
-                <p className="text-[11.5px] text-[var(--foreground-subtle)] italic">No files attached.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {attachments.map((att) => (
-                    <div
-                      key={att.id}
-                      className="flex items-center justify-between p-2.5 border border-[var(--border)] rounded-xl bg-[var(--card)] text-[12px]"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 mr-4">
-                        <FileText size={13} className="text-[var(--primary)] flex-shrink-0" />
-                        <span className="font-semibold text-[var(--foreground)] truncate" title={att.name}>
-                          {att.name}
-                        </span>
-                        <span className="text-[10px] text-[var(--foreground-subtle)] flex-shrink-0">
-                          ({att.size})
-                        </span>
-                      </div>
-                      <a
-                        href={att.url}
-                        className="text-[var(--primary)] hover:underline font-bold text-[11px] flex items-center gap-0.5 flex-shrink-0 cursor-pointer"
+              {/* Linked Entities (CRM, Projects, Tasks) */}
+              {(linkedCustomer || linkedProject || linkedTask) && (
+                <div className="pt-6 border-t border-[var(--border)] space-y-2">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-subtle)]">
+                    Linked Integrations
+                  </h4>
+                  <div className="flex flex-wrap gap-2.5">
+                    {linkedCustomer && (
+                      <Link
+                        href={`/customers/${linkedCustomer.id}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border)] rounded-xl bg-[var(--background-subtle)] hover:bg-slate-100 hover:border-[var(--primary)] text-[12px] text-[var(--primary)] transition-all font-semibold"
                       >
-                        <FileDown size={11} /> Get
-                      </a>
-                    </div>
-                  ))}
+                        <Building2 size={12} />
+                        <span>CRM: {linkedCustomer.name}</span>
+                        <ExternalLink size={9} />
+                      </Link>
+                    )}
+                    {linkedProject && (
+                      <Link
+                        href={`/projects/${linkedProject.id}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border)] rounded-xl bg-[var(--background-subtle)] hover:bg-slate-100 hover:border-[var(--primary)] text-[12px] text-[var(--primary)] transition-all font-semibold"
+                      >
+                        <FolderKanban size={12} />
+                        <span>Project: {linkedProject.name}</span>
+                        <ExternalLink size={9} />
+                      </Link>
+                    )}
+                    {linkedTask && (
+                      <div
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border)] rounded-xl bg-[var(--background-subtle)] text-[12px] text-[var(--foreground-muted)] font-semibold"
+                      >
+                        <CheckSquare size={12} />
+                        <span>Task: {linkedTask.title}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
 
-          </div>
+              {/* Attachments panel */}
+              <div className="pt-6 border-t border-[var(--border)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground-subtle)] flex items-center gap-1">
+                    <Paperclip size={11} /> Page Attachments ({attachments.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleAttachmentUpload}
+                    disabled={uploading}
+                    className="text-[11.5px] font-bold text-[var(--primary)] hover:underline cursor-pointer"
+                  >
+                    {uploading ? "Uploading..." : "+ Upload File"}
+                  </button>
+                </div>
+
+                {attachments.length === 0 ? (
+                  <p className="text-[11.5px] text-[var(--foreground-subtle)] italic">No files attached.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="flex items-center justify-between p-2.5 border border-[var(--border)] rounded-xl bg-[var(--card)] text-[12px]"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 mr-4">
+                          <FileText size={13} className="text-[var(--primary)] flex-shrink-0" />
+                          <span className="font-semibold text-[var(--foreground)] truncate" title={att.name}>
+                            {att.name}
+                          </span>
+                          <span className="text-[10px] text-[var(--foreground-subtle)] flex-shrink-0">
+                            ({att.size})
+                          </span>
+                        </div>
+                        <a
+                          href={att.url}
+                          className="text-[var(--primary)] hover:underline font-bold text-[11px] flex items-center gap-0.5 flex-shrink-0 cursor-pointer"
+                        >
+                          <FileDown size={11} /> Get
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )
         ) : (
           /* Editor Mode Workspace */
           <form onSubmit={handleSave} className="flex-1 flex overflow-hidden">

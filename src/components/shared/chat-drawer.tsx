@@ -14,11 +14,15 @@ import {
   Link as LinkIcon,
   ChevronDown,
   Hash,
+  Folder,
+  BookOpen,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import { useChatStore } from "@/stores/chat.store";
 import { useLeadsStore } from "@/stores/leads.store";
+import { useKnowledgeStore } from "@/stores/knowledge.store";
 import { mockUsers, mockDeals, mockProjects, mockTasks } from "@/lib/mock-data";
 import { getInitials } from "@/lib/utils";
 import { toast } from "sonner";
@@ -29,6 +33,7 @@ export function ChatDrawer() {
   const { user } = useAuthStore();
   const { isOpen, setIsOpen, activeChannel, setActiveChannel, messages, sendMessage, markChannelAsRead } = useChatStore();
   const { leads } = useLeadsStore();
+  const { spaces, documents } = useKnowledgeStore();
 
   const [inputContent, setInputContent] = useState("");
   const [selectedPings, setSelectedPings] = useState<PingedEntity[]>([]);
@@ -36,7 +41,7 @@ export function ChatDrawer() {
   // Suggestion typeahead state
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionQuery, setSuggestionQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<{ type: "lead" | "project" | "deal" | "task"; id: string; name: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<PingedEntity[]>([]);
 
   // Quick Ping Entity Selector State
   const [showPingModal, setShowPingModal] = useState(false);
@@ -92,6 +97,8 @@ export function ChatDrawer() {
     ...mockProjects.map((p) => ({ type: "project" as const, id: p.id, name: p.name })),
     ...mockDeals.map((d) => ({ type: "deal" as const, id: d.id, name: d.title })),
     ...mockTasks.map((t) => ({ type: "task" as const, id: t.id, name: t.title })),
+    ...documents.filter((d) => d.status !== "archived").map((d) => ({ type: "document" as const, id: d.id, name: d.title, spaceId: d.spaceId })),
+    ...spaces.filter((s) => !s.isArchived).map((s) => ({ type: "space" as const, id: s.id, name: s.name })),
   ];
 
   // Handle Input Changes to trigger typeahead
@@ -180,6 +187,10 @@ export function ChatDrawer() {
         return <DollarSign size={size} className="text-purple-500" />;
       case "task":
         return <CheckSquare size={size} className="text-amber-500" />;
+      case "document":
+        return <FileText size={size} className="text-blue-500" />;
+      case "space":
+        return <Folder size={size} className="text-yellow-500" />;
       default:
         return null;
     }
@@ -196,6 +207,10 @@ export function ChatDrawer() {
         return "border-purple-500/20 bg-purple-500/[0.02] hover:bg-purple-500/[0.06]";
       case "task":
         return "border-amber-500/20 bg-amber-500/[0.02] hover:bg-amber-500/[0.06]";
+      case "document":
+        return "border-blue-500/20 bg-blue-500/[0.02] hover:bg-blue-500/[0.06]";
+      case "space":
+        return "border-yellow-500/20 bg-yellow-500/[0.02] hover:bg-yellow-500/[0.06]";
       default:
         return "border-[var(--border)] bg-[var(--background-muted)]/20";
     }
@@ -216,6 +231,12 @@ export function ChatDrawer() {
         break;
       case "task":
         router.push("/tasks");
+        break;
+      case "document":
+        router.push(`/knowledge/space/${entity.spaceId || "space_eng"}/${entity.id}`);
+        break;
+      case "space":
+        router.push(`/knowledge/space/${entity.id}`);
         break;
     }
     toast.info(`Navigated to ${entity.type} details: ${entity.name}`);

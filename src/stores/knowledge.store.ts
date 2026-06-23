@@ -259,6 +259,7 @@ const INITIAL_DOCUMENTS: Document[] = [
     updatedBy: "user_3",
     createdAt: "2026-02-01T12:00:00Z",
     updatedAt: "2026-02-01T14:30:00Z",
+    type: "document",
   },
   {
     id: "doc_oauth",
@@ -280,6 +281,32 @@ const INITIAL_DOCUMENTS: Document[] = [
     updatedBy: "user_3",
     createdAt: "2026-02-05T15:00:00Z",
     updatedAt: "2026-02-05T15:00:00Z",
+    type: "document",
+  },
+  {
+    id: "doc_wb_architecture",
+    organizationId: "org_1",
+    title: "System Architecture Whiteboard",
+    content: "Canvas layout showing the system integration with Stripe, Next.js, and Firebase. Includes boxes for database models, webhooks flow, and client routers.",
+    authorId: "user_3",
+    spaceId: "space_eng",
+    tags: ["architecture", "canvas", "system"],
+    status: "published",
+    parentId: null,
+    order: 1,
+    createdBy: "user_3",
+    updatedBy: "user_3",
+    createdAt: "2026-03-01T10:00:00Z",
+    updatedAt: "2026-03-01T10:00:00Z",
+    type: "whiteboard",
+    canvasData: JSON.stringify([
+      { id: "rect_1", type: "rectangle", x: 100, y: 120, width: 140, height: 70, stroke: "#3b82f6", fill: "#dbeafe", strokeWidth: 2 },
+      { id: "text_1", type: "text", x: 110, y: 150, text: "Next.js Frontend", stroke: "#1e3a8a", size: 14 },
+      { id: "rect_2", type: "rectangle", x: 350, y: 120, width: 140, height: 70, stroke: "#10b981", fill: "#d1fae5", strokeWidth: 2 },
+      { id: "text_2", type: "text", x: 360, y: 150, text: "Firebase Database", stroke: "#065f46", size: 14 },
+      { id: "arrow_1", type: "arrow", x: 240, y: 155, tox: 350, toy: 155, stroke: "#6b7280", strokeWidth: 2 }
+    ]),
+    icon: "🎨"
   },
   {
     id: "doc_sales_playbook",
@@ -299,6 +326,28 @@ const INITIAL_DOCUMENTS: Document[] = [
     updatedBy: "user_2",
     createdAt: "2026-02-18T10:00:00Z",
     updatedAt: "2026-02-18T10:00:00Z",
+    type: "document",
+  },
+  {
+    id: "doc_file_spec",
+    organizationId: "org_1",
+    title: "Stripe_Webhook_Specification.pdf",
+    content: "Stripe webhook flow mapping. Highlights client payments processing, invoice settlement logic, and checkout payment success notification handlers. Verifies signature using secret keys.",
+    authorId: "user_2",
+    spaceId: "space_sales",
+    tags: ["billing", "stripe", "pdf"],
+    status: "published",
+    parentId: null,
+    order: 1,
+    createdBy: "user_2",
+    updatedBy: "user_2",
+    createdAt: "2026-03-05T12:00:00Z",
+    updatedAt: "2026-03-05T12:00:00Z",
+    type: "file",
+    fileUrl: "#",
+    fileSize: "1.2 MB",
+    fileType: "application/pdf",
+    icon: "📄"
   },
   {
     id: "doc_handbook",
@@ -322,6 +371,7 @@ const INITIAL_DOCUMENTS: Document[] = [
     updatedBy: "user_1",
     createdAt: "2026-01-02T09:00:00Z",
     updatedAt: "2026-01-02T09:00:00Z",
+    type: "document",
   },
 ];
 

@@ -11,7 +11,7 @@ export interface ActionMenuItem {
   danger?: boolean;
 }
 
-export function ActionMenu({ actions }: { actions: ActionMenuItem[] }) {
+export function ActionMenu({ actions, trigger }: { actions: ActionMenuItem[]; trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -38,17 +38,19 @@ export function ActionMenu({ actions }: { actions: ActionMenuItem[] }) {
     <div className="relative">
       <button
         ref={btnRef}
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
         className={cn(
-          "sos-btn sos-btn-ghost p-1 rounded-md transition-colors",
-          open && "bg-[var(--background-muted)]"
+          !trigger && "sos-btn sos-btn-ghost p-1 rounded-md transition-colors",
+          !trigger && open && "bg-[var(--background-muted)]",
+          trigger && "focus:outline-none bg-transparent border-none p-0 cursor-pointer"
         )}
         aria-label="Actions"
       >
-        <MoreHorizontal size={13} />
+        {trigger || <MoreHorizontal size={13} />}
       </button>
 
       {open && (

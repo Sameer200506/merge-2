@@ -404,9 +404,10 @@ export interface Shift {
 
 // ─── CRM Chat Types ───────────────────────────────────────────
 export interface PingedEntity {
-  type: "lead" | "project" | "deal" | "task";
+  type: "lead" | "project" | "deal" | "task" | "document" | "space";
   id: string;
   name: string;
+  spaceId?: string;
 }
 
 export interface ChatMessage {

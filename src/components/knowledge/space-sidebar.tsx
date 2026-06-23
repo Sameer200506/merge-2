@@ -16,6 +16,8 @@ import {
   Trash2,
   Archive,
   Book,
+  Palette,
+  Paperclip,
 } from "lucide-react";
 import { ActionMenu } from "@/components/shared/action-menu";
 import type { Space, Document, ID } from "@/types";
@@ -41,7 +43,7 @@ interface TreeNodeProps {
   expandedNodes: Record<string, boolean>;
   toggleNode: (id: string) => void;
   onSelect: (id: string) => void;
-  onAddChild: (parentId: string) => void;
+  onAddChild: (parentId: string, type: "document" | "whiteboard" | "file") => void;
   onDelete: (id: string) => void;
   onArchive: (id: string) => void;
 }
@@ -95,10 +97,14 @@ function TreeNode({
         )}
 
         {/* Page Icon */}
-        {hasChildren ? (
-          <Folder size={13} className={cn("text-[#f59e0b] opacity-80", isActive && "text-[var(--sidebar-item-active-text)]")} />
+        {doc.type === "whiteboard" ? (
+          <Palette size={13} className={cn("text-purple-500 opacity-80 flex-shrink-0", isActive && "text-[var(--sidebar-item-active-text)]")} />
+        ) : doc.type === "file" ? (
+          <Paperclip size={13} className={cn("text-emerald-500 opacity-80 flex-shrink-0", isActive && "text-[var(--sidebar-item-active-text)]")} />
+        ) : hasChildren ? (
+          <Folder size={13} className={cn("text-[#f59e0b] opacity-80 flex-shrink-0", isActive && "text-[var(--sidebar-item-active-text)]")} />
         ) : (
-          <FileText size={13} className={cn("text-[var(--primary)] opacity-70", isActive && "text-[var(--sidebar-item-active-text)]")} />
+          <FileText size={13} className={cn("text-[var(--primary)] opacity-70 flex-shrink-0", isActive && "text-[var(--sidebar-item-active-text)]")} />
         )}
 
         {/* Title */}
@@ -120,16 +126,26 @@ function TreeNode({
             actions={[
               {
                 label: "Add Child Page",
-                icon: Plus,
-                onClick: () => onAddChild(doc.id),
+                icon: FileText,
+                onClick: () => onAddChild(doc.id, "document"),
               },
               {
-                label: "Archive Page",
+                label: "Add Whiteboard",
+                icon: Palette,
+                onClick: () => onAddChild(doc.id, "whiteboard"),
+              },
+              {
+                label: "Upload File",
+                icon: Paperclip,
+                onClick: () => onAddChild(doc.id, "file"),
+              },
+              {
+                label: "Archive Item",
                 icon: Archive,
                 onClick: () => onArchive(doc.id),
               },
               {
-                label: "Delete Page",
+                label: "Delete Item",
                 icon: Trash2,
                 danger: true,
                 onClick: () => onDelete(doc.id),
@@ -182,43 +198,130 @@ export function SpaceSidebar({ space, documents, activeDocId, onSearchOpen }: Sp
     router.push(`/knowledge/space/${space.id}/${id}`);
   };
 
-  const handleCreateRootPage = async () => {
+  const handleCreateRootPage = async (type: "document" | "whiteboard" | "file" = "document") => {
+    if (type === "file") {
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type === "text/plain") {
+          const reader = new FileReader();
+          reader.onload = async (evt) => {
+            const text = evt.target?.result as string;
+            await createFileDoc(file.name, file.type, file.size, text, null);
+          };
+          reader.readAsText(file);
+        } else {
+          let mockOCR = `Simulated OCR/Text extraction for ${file.name}.\n`;
+          if (file.name.toLowerCase().includes("stripe")) {
+            mockOCR += "Stripe webhook flow mapping. Highlights client payments processing, invoice settlement logic, and checkout payment success notification handlers. Verifies signature using secret keys.";
+          } else if (file.name.toLowerCase().includes("financial")) {
+            mockOCR += "StartupOS financial report Q1 2026. Total revenue $1,540,000, net profit $462,000. Customer acquisition cost $120. Runway estimated at 24 months.";
+          } else {
+            mockOCR += `Full text content extracted from document. Keyword search is fully indexed for search results. Matches filename ${file.name}.`;
+          }
+          await createFileDoc(file.name, file.type, file.size, mockOCR, null);
+        }
+      };
+      fileInput.click();
+      return;
+    }
+
     try {
       const newId = await addDocument({
-        title: "Untitled Page",
-        content: "<h1>Untitled Page</h1><p>Start writing here...</p>",
-        authorId: "user_1", // Default current user mock
+        title: type === "whiteboard" ? "Untitled Whiteboard" : "Untitled Page",
+        content: type === "whiteboard" ? "Whiteboard Canvas" : "<h1>Untitled Page</h1><p>Start writing here...</p>",
+        authorId: "user_1",
         spaceId: space.id,
         tags: [],
         status: "draft",
         parentId: null,
         order: rootDocs.length,
+        type,
+        canvasData: type === "whiteboard" ? JSON.stringify([]) : undefined,
+        icon: type === "whiteboard" ? "🎨" : undefined,
       });
       router.push(`/knowledge/space/${space.id}/${newId}?edit=true`);
-      toast.success("Document draft created!");
+      toast.success(`${type === "whiteboard" ? "Whiteboard" : "Document"} draft created!`);
     } catch (e) {
       toast.error("Failed to create document");
     }
   };
 
-  const handleCreateChildPage = async (parentId: string) => {
-    // Auto expand parent
+  const createFileDoc = async (fileName: string, fileType: string, fileSize: number, fileText: string, parentId: string | null) => {
+    try {
+      const newId = await addDocument({
+        title: fileName,
+        content: fileText,
+        authorId: "user_1",
+        spaceId: space.id,
+        tags: ["uploaded"],
+        status: "published",
+        parentId,
+        order: documents.filter((d) => d.parentId === parentId && d.spaceId === space.id).length,
+        type: "file",
+        fileUrl: "#",
+        fileSize: (fileSize / 1024).toFixed(0) + " KB",
+        fileType,
+        icon: fileType.startsWith("image/") ? "🖼️" : "📄",
+      });
+      router.push(`/knowledge/space/${space.id}/${newId}`);
+      toast.success(`File "${fileName}" uploaded and indexed!`);
+    } catch (e) {
+      toast.error("Failed to upload file");
+    }
+  };
+
+  const handleCreateChildPage = async (parentId: string, type: "document" | "whiteboard" | "file" = "document") => {
     setExpandedNodes((prev) => ({ ...prev, [parentId]: true }));
+
+    if (type === "file") {
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type === "text/plain") {
+          const reader = new FileReader();
+          reader.onload = async (evt) => {
+            const text = evt.target?.result as string;
+            await createFileDoc(file.name, file.type, file.size, text, parentId);
+          };
+          reader.readAsText(file);
+        } else {
+          let mockOCR = `Simulated OCR/Text extraction for ${file.name}.\n`;
+          if (file.name.toLowerCase().includes("stripe")) {
+            mockOCR += "Stripe webhook flow mapping. Highlights client payments processing, invoice settlement logic, and checkout payment success notification handlers. Verifies signature using secret keys.";
+          } else {
+            mockOCR += `Full text content extracted from document. Matches filename ${file.name}.`;
+          }
+          await createFileDoc(file.name, file.type, file.size, mockOCR, parentId);
+        }
+      };
+      fileInput.click();
+      return;
+    }
 
     const siblings = documents.filter((d) => d.parentId === parentId);
     try {
       const newId = await addDocument({
-        title: "Untitled Subpage",
-        content: "<h1>Untitled Subpage</h1><p>Start writing here...</p>",
+        title: type === "whiteboard" ? "Untitled Whiteboard" : "Untitled Subpage",
+        content: type === "whiteboard" ? "Whiteboard Canvas" : "<h1>Untitled Subpage</h1><p>Start writing here...</p>",
         authorId: "user_1",
         spaceId: space.id,
         tags: [],
         status: "draft",
         parentId: parentId,
         order: siblings.length,
+        type,
+        canvasData: type === "whiteboard" ? JSON.stringify([]) : undefined,
+        icon: type === "whiteboard" ? "🎨" : undefined,
       });
       router.push(`/knowledge/space/${space.id}/${newId}?edit=true`);
-      toast.success("Subpage draft created!");
+      toast.success(`${type === "whiteboard" ? "Whiteboard" : "Subpage"} draft created!`);
     } catch (e) {
       toast.error("Failed to create subpage");
     }
@@ -293,13 +396,33 @@ export function SpaceSidebar({ space, documents, activeDocId, onSearchOpen }: Sp
       <div className="flex-1 overflow-y-auto px-2 space-y-1">
         <div className="flex items-center justify-between px-2 py-1 text-[10px] uppercase font-bold tracking-wider text-[var(--foreground-subtle)]">
           <span>Pages</span>
-          <button
-            onClick={handleCreateRootPage}
-            className="p-0.5 hover:bg-[var(--sidebar-item-hover)] rounded text-[var(--foreground-muted)] cursor-pointer"
-            title="New Page"
-          >
-            <Plus size={11} />
-          </button>
+          <ActionMenu
+            trigger={
+              <button
+                className="p-0.5 hover:bg-[var(--sidebar-item-hover)] rounded text-[var(--foreground-muted)] cursor-pointer"
+                title="Create content"
+              >
+                <Plus size={11} />
+              </button>
+            }
+            actions={[
+              {
+                label: "New Page",
+                icon: FileText,
+                onClick: () => handleCreateRootPage("document"),
+              },
+              {
+                label: "New Whiteboard",
+                icon: Palette,
+                onClick: () => handleCreateRootPage("whiteboard"),
+              },
+              {
+                label: "Upload File",
+                icon: Paperclip,
+                onClick: () => handleCreateRootPage("file"),
+              },
+            ]}
+          />
         </div>
 
         {rootDocs.length === 0 ? (
@@ -307,7 +430,7 @@ export function SpaceSidebar({ space, documents, activeDocId, onSearchOpen }: Sp
             <Book size={20} className="mx-auto mb-1.5 opacity-25" />
             <p className="text-[11px] italic">No pages created yet.</p>
             <button
-              onClick={handleCreateRootPage}
+              onClick={() => handleCreateRootPage("document")}
               className="text-[11px] text-[var(--primary)] hover:underline mt-1 font-semibold"
             >
               Create first page
