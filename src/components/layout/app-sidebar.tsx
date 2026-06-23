@@ -35,16 +35,26 @@ interface SidebarItemProps {
   label: string;
   collapsed: boolean;
   active: boolean;
+  badgeCount?: number;
   onClick?: (e: React.MouseEvent) => void;
 }
 
-function SidebarItem({ href, icon: Icon, label, collapsed, active, onClick }: SidebarItemProps) {
+function SidebarItem({ href, icon: Icon, label, collapsed, active, badgeCount, onClick }: SidebarItemProps) {
+  const badgeEl = badgeCount && badgeCount > 0 ? (
+    <span className={cn(
+      "rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0 transition-all",
+      collapsed ? "absolute top-1 right-1 w-2.5 h-2.5 text-[0px] overflow-hidden" : "w-4 h-4 ml-auto"
+    )}>
+      {collapsed ? "" : badgeCount}
+    </span>
+  ) : null;
+
   if (onClick) {
     return (
       <button
         onClick={onClick}
         className={cn(
-          "sos-sidebar-item w-full text-left cursor-pointer",
+          "sos-sidebar-item w-full text-left cursor-pointer relative",
           active && "active",
           collapsed && "justify-center px-2"
         )}
@@ -52,6 +62,7 @@ function SidebarItem({ href, icon: Icon, label, collapsed, active, onClick }: Si
       >
         <Icon size={16} className="flex-shrink-0" />
         {!collapsed && <span className="truncate">{label}</span>}
+        {badgeEl}
       </button>
     );
   }
@@ -59,7 +70,7 @@ function SidebarItem({ href, icon: Icon, label, collapsed, active, onClick }: Si
     <Link
       href={href}
       className={cn(
-        "sos-sidebar-item",
+        "sos-sidebar-item relative",
         active && "active",
         collapsed && "justify-center px-2"
       )}
@@ -67,6 +78,7 @@ function SidebarItem({ href, icon: Icon, label, collapsed, active, onClick }: Si
     >
       <Icon size={16} className="flex-shrink-0" />
       {!collapsed && <span className="truncate">{label}</span>}
+      {badgeEl}
     </Link>
   );
 }
@@ -88,7 +100,20 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, sidebarOpen, toggleSidebar } = useUIStore();
   const { user, organization } = useAuthStore();
-  const { isOpen: chatIsOpen, setIsOpen: setChatIsOpen } = useChatStore();
+  const { isOpen: chatIsOpen, setIsOpen: setChatIsOpen, messages, lastReadTimes } = useChatStore();
+  const unreadChatCount = user ? messages.filter((msg) => {
+    if (msg.senderId === user.id) return false;
+    if (!msg.recipientId) {
+      const lastRead = lastReadTimes["public"];
+      if (!lastRead) return true;
+      return new Date(msg.timestamp).getTime() > new Date(lastRead).getTime();
+    } else if (msg.recipientId === user.id) {
+      const lastRead = lastReadTimes[`private:${msg.senderId}`];
+      if (!lastRead) return true;
+      return new Date(msg.timestamp).getTime() > new Date(lastRead).getTime();
+    }
+    return false;
+  }).length : 0;
   const [newDealOpen, setNewDealOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -255,6 +280,7 @@ export function AppSidebar() {
                       {...item}
                       collapsed={collapsed}
                       active={isChat ? chatIsOpen : isActive(item.href)}
+                      badgeCount={isChat ? unreadChatCount : undefined}
                       onClick={isChat ? (e) => {
                         e.preventDefault();
                         setChatIsOpen(true);

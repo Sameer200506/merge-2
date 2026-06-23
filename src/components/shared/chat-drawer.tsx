@@ -27,7 +27,7 @@ import type { PingedEntity } from "@/types";
 export function ChatDrawer() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { isOpen, setIsOpen, activeChannel, setActiveChannel, messages, sendMessage } = useChatStore();
+  const { isOpen, setIsOpen, activeChannel, setActiveChannel, messages, sendMessage, markChannelAsRead } = useChatStore();
   const { leads } = useLeadsStore();
 
   const [inputContent, setInputContent] = useState("");
@@ -50,6 +50,14 @@ export function ChatDrawer() {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, activeChannel, isOpen]);
+
+  // Mark channel as read when drawer is open, channel changes, or new messages arrive
+  useEffect(() => {
+    if (isOpen) {
+      const key = activeChannel.type === "public" ? "public" : `private:${activeChannel.userId}`;
+      markChannelAsRead(key);
+    }
+  }, [isOpen, activeChannel, messages, markChannelAsRead]);
 
   // Escape key close
   useEffect(() => {

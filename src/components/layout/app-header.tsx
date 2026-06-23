@@ -29,8 +29,10 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
 import { useShiftsStore } from "@/stores/shifts.store";
+import type { Notification } from "@/types";
 import { useChatStore } from "@/stores/chat.store";
-import { mockNotifications, mockUsers } from "@/lib/mock-data";
+import { useNotificationsStore } from "@/stores/notifications.store";
+import { mockUsers } from "@/lib/mock-data";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -91,7 +93,7 @@ function NotificationsPanel({
   open: boolean;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
-  notifications: typeof mockNotifications;
+  notifications: Notification[];
   onMarkAllRead: () => void;
   onClearAll: () => void;
   onClearNotif: (id: string) => void;
@@ -484,20 +486,35 @@ export function AppHeader() {
   const { theme } = useUIStore();
   const { user } = useAuthStore();
   const { activeShifts, shifts, clockIn, clockOut } = useShiftsStore();
-  const { setIsOpen: setChatIsOpen } = useChatStore();
+  const { setIsOpen: setChatIsOpen, messages, lastReadTimes } = useChatStore();
+  const { notifications, markAllRead, clearAll, clearNotif } = useNotificationsStore();
+  
   const activeShift = user ? activeShifts.find((s) => s.userId === user.id) : null;
   const isClockedIn = !!activeShift;
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [staffShiftsOpen, setStaffShiftsOpen] = useState(false);
-  const [notifications, setNotifications] = useState(mockNotifications);
 
   const notifRef = useRef<HTMLButtonElement>(null);
   const avatarRef = useRef<HTMLButtonElement>(null);
   const staffShiftsRef = useRef<HTMLButtonElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const unreadChatCount = user ? messages.filter((msg) => {
+    if (msg.senderId === user.id) return false;
+    if (!msg.recipientId) {
+      const lastRead = lastReadTimes["public"];
+      if (!lastRead) return true;
+      return new Date(msg.timestamp).getTime() > new Date(lastRead).getTime();
+    } else if (msg.recipientId === user.id) {
+      const lastRead = lastReadTimes[`private:${msg.senderId}`];
+      if (!lastRead) return true;
+      return new Date(msg.timestamp).getTime() > new Date(lastRead).getTime();
+    }
+    return false;
+  }).length : 0;
 
   const toggleNotif = () => {
     setUserMenuOpen(false);
@@ -515,18 +532,6 @@ export function AppHeader() {
     setUserMenuOpen(false);
     setNotifOpen(false);
     setStaffShiftsOpen((v) => !v);
-  };
-
-  const markAllRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, isRead: true })));
-  };
-
-  const clearAll = () => {
-    setNotifications([]);
-  };
-
-  const clearNotif = (id: string) => {
-    setNotifications(notifications.filter(n => n.id !== id));
   };
 
   return (
@@ -669,10 +674,15 @@ export function AppHeader() {
         {user && (
           <button
             onClick={() => setChatIsOpen(true)}
-            className="sos-btn sos-btn-ghost p-1.5 text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+            className="sos-btn sos-btn-ghost p-1.5 text-[var(--foreground-muted)] hover:text-[var(--foreground)] relative"
             aria-label="Open Chat"
           >
             <MessageSquare size={16} />
+            {unreadChatCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center animate-scale-in">
+                {unreadChatCount}
+              </span>
+            )}
           </button>
         )}
 

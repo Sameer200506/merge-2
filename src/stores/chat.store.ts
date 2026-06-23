@@ -15,6 +15,7 @@ interface ChatState {
   isOpen: boolean;
   activeChannel: ActiveChannel;
   messages: ChatMessage[];
+  lastReadTimes: Record<string, string>;
   // Actions
   setIsOpen: (open: boolean) => void;
   setActiveChannel: (channel: ActiveChannel) => void;
@@ -27,6 +28,7 @@ interface ChatState {
     pingedEntities?: PingedEntity[]
   ) => void;
   clearMessages: () => void;
+  markChannelAsRead: (channelKey: string) => void;
 }
 
 const INITIAL_MOCK_MESSAGES: ChatMessage[] = [
@@ -118,13 +120,29 @@ const INITIAL_MOCK_MESSAGES: ChatMessage[] = [
 
 export const useChatStore = create<ChatState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isOpen: false,
       activeChannel: { type: "public" },
       messages: INITIAL_MOCK_MESSAGES,
+      lastReadTimes: {
+        public: new Date(Date.now() - 3600000 * 3).toISOString(), // 3 hours ago by default
+      },
 
-      setIsOpen: (open) => set({ isOpen: open }),
-      setActiveChannel: (channel) => set({ activeChannel: channel }),
+      setIsOpen: (open) => {
+        set({ isOpen: open });
+        if (open) {
+          const { activeChannel, markChannelAsRead } = get();
+          const key = activeChannel.type === "public" ? "public" : `private:${activeChannel.userId}`;
+          markChannelAsRead(key);
+        }
+      },
+      setActiveChannel: (channel) => {
+        set({ activeChannel: channel });
+        if (get().isOpen) {
+          const key = channel.type === "public" ? "public" : `private:${channel.userId}`;
+          get().markChannelAsRead(key);
+        }
+      },
       setMessages: (messages) => set({ messages }),
 
       sendMessage: (senderId, senderName, content, recipientId, pingedEntities) => {
@@ -165,6 +183,15 @@ export const useChatStore = create<ChatState>()(
           // but we can clear local state representation
         }
         set({ messages: [] });
+      },
+
+      markChannelAsRead: (channelKey) => {
+        set((state) => ({
+          lastReadTimes: {
+            ...state.lastReadTimes,
+            [channelKey]: new Date().toISOString(),
+          }
+        }));
       },
     }),
     {
