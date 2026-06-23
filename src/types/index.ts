@@ -444,3 +444,5 @@ export interface Payment {
   note?: string;
   transactionId?: string;
 }
+
+export * from "./knowledge";

@@ -18,6 +18,7 @@ import {
   Target,
   MessageSquare,
   Wallet,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui.store";
@@ -139,6 +140,7 @@ export function AppSidebar() {
         { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
         { href: "/leads", icon: Target, label: "Leads" },
         { href: "#chat", icon: MessageSquare, label: "Chat" },
+        { href: "/knowledge", icon: BookOpen, label: "Knowledge Hub" },
         { href: "/activity", icon: Activity, label: "Activity" },
       ],
     },

@@ -15,9 +15,12 @@ import {
   MoreHorizontal,
   Flag,
   Layers,
+  ChevronRight,
+  FileText,
 } from "lucide-react";
 import { cn, formatDate, getInitials } from "@/lib/utils";
 import { mockProjects, mockTasks, mockCustomers, getUserById } from "@/lib/mock-data";
+import { useKnowledgeStore } from "@/stores/knowledge.store";
 import type { ProjectStatus, TaskStatus } from "@/types";
 
 const statusConfig: Record<ProjectStatus, { label: string; className: string }> = {
@@ -28,7 +31,7 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
   on_hold: { label: "On Hold", className: "status-on_hold" },
 };
 
-const TABS = ["Overview", "Work Items", "Roadmap", "Sprints", "Files", "Settings"];
+const TABS = ["Overview", "Work Items", "Roadmap", "Sprints", "Documentation", "Files", "Settings"];
 
 const taskStatusConfig: Record<TaskStatus, { label: string; color: string }> = {
   backlog: { label: "Backlog", color: "#94a3b8" },
@@ -321,6 +324,25 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
+      {activeTab === "Documentation" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-[14px] font-bold text-[var(--foreground)]">Project Documentation</h3>
+              <p className="text-[12px] text-[var(--foreground-muted)]">Project wikis, technical notes, specifications, and checklists linked to this project</p>
+            </div>
+            <Link
+              href={`/knowledge?projectId=${project.id}`}
+              className="sos-btn sos-btn-primary py-1.5 px-3 text-[12.5px]"
+            >
+              <Plus size={12} /> Create Document
+            </Link>
+          </div>
+          {/* List project documents from knowledge store */}
+          <ProjectDocumentsList projectId={project.id} />
+        </div>
+      )}
+
       {(activeTab === "Roadmap" || activeTab === "Sprints" || activeTab === "Files" || activeTab === "Settings") && (
         <div className="empty-state sos-card">
           <FolderKanban size={36} className="mb-3 opacity-30" />
@@ -328,6 +350,49 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <p className="text-[13px] mt-1">Advanced roadmap, sprint planning and file management</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProjectDocumentsList({ projectId }: { projectId: string }) {
+  const { documents, spaces } = useKnowledgeStore();
+  const projectDocs = documents.filter((d) => d.projectId === projectId && d.status !== "archived");
+
+  if (projectDocs.length === 0) {
+    return (
+      <div className="py-12 text-center border border-dashed border-[var(--border)] rounded-xl bg-[var(--background-subtle)] text-[var(--foreground-subtle)]">
+        <FileText size={28} className="mx-auto mb-2 opacity-25 text-[var(--primary)]" />
+        <p className="text-[13px] font-semibold text-[var(--foreground)]">No documentation created yet</p>
+        <p className="text-[11px] mt-0.5">Link documents to this project from the Knowledge Hub edit panel.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {projectDocs.map((doc) => {
+        const space = spaces.find((s) => s.id === doc.spaceId);
+        return (
+          <Link
+            key={doc.id}
+            href={`/knowledge/space/${doc.spaceId}/${doc.id}`}
+            className="flex items-center justify-between p-4 border border-[var(--border)] rounded-xl bg-[var(--card)] hover:border-[var(--primary)] transition-all group shadow-xs"
+          >
+            <div className="min-w-0 mr-4">
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-[var(--primary)] border border-indigo-150 uppercase dark:bg-indigo-950/20">
+                {space?.name || "Space"}
+              </span>
+              <h4 className="text-[13px] font-semibold text-[var(--foreground)] truncate mt-1.5 group-hover:text-[var(--primary)] transition-colors">
+                {doc.title}
+              </h4>
+              <p className="text-[11px] text-[var(--foreground-subtle)] mt-0.5">
+                Updated {formatDate(doc.updatedAt)}
+              </p>
+            </div>
+            <ChevronRight size={14} className="text-[var(--foreground-subtle)] opacity-40 group-hover:opacity-100 group-hover:text-[var(--primary)] transition-all flex-shrink-0" />
+          </Link>
+        );
+      })}
     </div>
   );
 }

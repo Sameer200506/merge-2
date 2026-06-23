@@ -7,7 +7,8 @@ import { useLeadsStore } from "@/stores/leads.store";
 import { useChatStore } from "@/stores/chat.store";
 import { useShiftsStore } from "@/stores/shifts.store";
 import { useAuthStore } from "@/stores/auth.store";
-import type { Lead, ChatMessage, Shift } from "@/types";
+import { useKnowledgeStore } from "@/stores/knowledge.store";
+import type { Lead, ChatMessage, Shift, Space, Document, DocumentVersion, DocumentComment, DocumentTemplate } from "@/types";
 import { toast } from "sonner";
 
 export function FirebaseSync() {
@@ -15,6 +16,7 @@ export function FirebaseSync() {
   const { setMessages } = useChatStore();
   const { setActiveShifts, setShifts } = useShiftsStore();
   const { user, sessionId, logout } = useAuthStore();
+  const { setSpaces, setDocuments, setVersions, setComments, setTemplates } = useKnowledgeStore();
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
@@ -84,7 +86,72 @@ export function FirebaseSync() {
       }
     );
 
-    // 5. Sync Session Lock (Prevent Concurrent Logins)
+    // 5. Sync Knowledge Spaces
+    const unsubscribeSpaces = onSnapshot(
+      collection(db, "spaces"),
+      (snapshot) => {
+        const list: Space[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() } as Space);
+        });
+        setSpaces(list);
+      },
+      (error) => console.error("Firestore spaces sync error:", error)
+    );
+
+    // 6. Sync Knowledge Documents
+    const unsubscribeDocs = onSnapshot(
+      collection(db, "documents"),
+      (snapshot) => {
+        const list: Document[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() } as Document);
+        });
+        setDocuments(list);
+      },
+      (error) => console.error("Firestore docs sync error:", error)
+    );
+
+    // 7. Sync Knowledge Versions
+    const unsubscribeVersions = onSnapshot(
+      collection(db, "documentVersions"),
+      (snapshot) => {
+        const list: DocumentVersion[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() } as DocumentVersion);
+        });
+        setVersions(list);
+      },
+      (error) => console.error("Firestore versions sync error:", error)
+    );
+
+    // 8. Sync Knowledge Comments
+    const unsubscribeComments = onSnapshot(
+      collection(db, "documentComments"),
+      (snapshot) => {
+        const list: DocumentComment[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() } as DocumentComment);
+        });
+        setComments(list);
+      },
+      (error) => console.error("Firestore comments sync error:", error)
+    );
+
+    // 9. Sync Knowledge Templates
+    const unsubscribeTemplates = onSnapshot(
+      collection(db, "documentTemplates"),
+      (snapshot) => {
+        const list: DocumentTemplate[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() } as DocumentTemplate);
+        });
+        setTemplates(list);
+      },
+      (error) => console.error("Firestore templates sync error:", error)
+    );
+
+    // 10. Sync Session Lock (Prevent Concurrent Logins)
     let unsubscribeSession = () => {};
     if (user && sessionId) {
       unsubscribeSession = onSnapshot(
@@ -113,10 +180,28 @@ export function FirebaseSync() {
       unsubscribeChats();
       unsubscribeActiveShifts();
       unsubscribeShifts();
+      unsubscribeSpaces();
+      unsubscribeDocs();
+      unsubscribeVersions();
+      unsubscribeComments();
+      unsubscribeTemplates();
       unsubscribeSession();
       console.log("🛑 Firebase Sync listeners closed.");
     };
-  }, [setLeads, setMessages, setActiveShifts, setShifts, user, sessionId, logout]);
+  }, [
+    setLeads,
+    setMessages,
+    setActiveShifts,
+    setShifts,
+    setSpaces,
+    setDocuments,
+    setVersions,
+    setComments,
+    setTemplates,
+    user,
+    sessionId,
+    logout,
+  ]);
 
   return null;
 }
