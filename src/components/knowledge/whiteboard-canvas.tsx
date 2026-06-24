@@ -15,6 +15,10 @@ import {
   Users,
   Palette,
   Check,
+  Eraser,
+  Hand,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { useChatStore } from "@/stores/chat.store";
@@ -48,6 +52,113 @@ interface CanvasElement {
   strokeWidth: number;
 }
 
+// ── Math & Position Helper Functions ─────────────────────────────────
+
+const distanceToSegment = (x: number, y: number, x1: number, y1: number, x2: number, y2: number) => {
+  const A = x - x1;
+  const B = y - y1;
+  const C = x2 - x1;
+  const D = y2 - y1;
+
+  const dot = A * C + B * D;
+  const lenSq = C * C + D * D;
+  let param = -1;
+  if (lenSq !== 0) param = dot / lenSq;
+
+  let xx, yy;
+  if (param < 0) {
+    xx = x1;
+    yy = y1;
+  } else if (param > 1) {
+    xx = x2;
+    yy = y2;
+  } else {
+    xx = x1 + param * C;
+    yy = y1 + param * D;
+  }
+
+  const dx = x - xx;
+  const dy = y - yy;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+const isNearPoint = (x1: number, y1: number, x2: number, y2: number) => {
+  return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2) < 8;
+};
+
+const isNearPencil = (x: number, y: number, points: Point[]) => {
+  return points.some((p) => isNearPoint(x, y, p.x, p.y));
+};
+
+const isInsideRect = (x: number, y: number, rx: number, ry: number, rw: number, rh: number) => {
+  const minX = Math.min(rx, rx + rw);
+  const maxX = Math.max(rx, rx + rw);
+  const minY = Math.min(ry, ry + rh);
+  const maxY = Math.max(ry, ry + rh);
+  return x >= minX && x <= maxX && y >= minY && y <= maxY;
+};
+
+const isInsideEllipse = (x: number, y: number, ex: number, ey: number, ew: number, eh: number) => {
+  const cx = ex + ew / 2;
+  const cy = ey + eh / 2;
+  const rx = Math.abs(ew / 2);
+  const ry = Math.abs(eh / 2);
+  if (rx === 0 || ry === 0) return false;
+  const normX = (x - cx) / rx;
+  const normY = (y - cy) / ry;
+  return normX * normX + normY * normY <= 1.1; // 10% margin
+};
+
+const isInsideText = (x: number, y: number, tx: number, ty: number, fontSize: number, text: string) => {
+  const estimatedHeight = fontSize;
+  const estimatedWidth = text.length * fontSize * 0.6;
+  return x >= tx && x <= tx + estimatedWidth && y >= ty - estimatedHeight && y <= ty;
+};
+
+const getElementAtPosition = (x: number, y: number, elements: CanvasElement[]) => {
+  // Search in reverse order to select the topmost element first
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (el.type === "pencil" && el.points && isNearPencil(x, y, el.points)) {
+      return el;
+    }
+    if (el.type === "rectangle" && isInsideRect(x, y, el.x, el.y, el.width, el.height)) {
+      return el;
+    }
+    if (el.type === "ellipse" && isInsideEllipse(x, y, el.x, el.y, el.width, el.height)) {
+      return el;
+    }
+    if (el.type === "line" && distanceToSegment(x, y, el.x, el.y, el.x + el.width, el.y + el.height) < 8) {
+      return el;
+    }
+    if (el.type === "arrow" && distanceToSegment(x, y, el.x, el.y, el.x + el.width, el.y + el.height) < 8) {
+      return el;
+    }
+    if (el.type === "text" && el.text && isInsideText(x, y, el.x, el.y, el.strokeWidth * 6 + 10, el.text)) {
+      return el;
+    }
+  }
+  return null;
+};
+
+const getElementBounds = (el: CanvasElement) => {
+  if (el.type === "pencil" && el.points) {
+    const xs = el.points.map((p) => p.x);
+    const ys = el.points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  } else {
+    const x = Math.min(el.x, el.x + el.width);
+    const y = Math.min(el.y, el.y + el.height);
+    const width = Math.abs(el.width);
+    const height = Math.abs(el.height);
+    return { x, y, width, height };
+  }
+};
+
 export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: WhiteboardCanvasProps) {
   const { user: currentUser } = useAuthStore();
   const { sendMessage } = useChatStore();
@@ -56,7 +167,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Tools & Styling States
-  const [tool, setTool] = useState<CanvasElement["type"] | "pointer">("pencil");
+  const [tool, setTool] = useState<CanvasElement["type"] | "pointer" | "eraser" | "hand">("pencil");
   const [strokeColor, setStrokeColor] = useState("#3b82f6"); // Default blue
   const [fillColor, setFillColor] = useState("transparent");
   const [strokeWidth, setStrokeWidth] = useState(2);
@@ -68,6 +179,23 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
   const [isDrawing, setIsDrawing] = useState(false);
   const [activeElement, setActiveElement] = useState<CanvasElement | null>(null);
   const [textInput, setTextInput] = useState<{ x: number; y: number; text: string } | null>(null);
+
+  // Selection states
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [isDraggingElement, setIsDraggingElement] = useState(false);
+  const dragStartMouse = useRef<Point | null>(null);
+  const dragStartElement = useRef<CanvasElement | null>(null);
+
+  // Pan Offset state
+  const [panOffset, setPanOffset] = useState<Point>({ x: 0, y: 0 });
+  const isPanning = useRef(false);
+  const panStart = useRef<Point>({ x: 0, y: 0 });
+
+  // Zoom state
+  const [zoom, setZoom] = useState(1);
+
+  // Tracking serialized state to prevent loop reset
+  const lastSerializedRef = useRef("");
 
   // Teammate Invitation State
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -91,15 +219,27 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
     { name: "Orange Sub", hex: "rgba(249, 115, 22, 0.15)" },
   ];
 
+  // Reset whiteboard local parameters if document / space swaps
+  useEffect(() => {
+    setElements([]);
+    setHistory([]);
+    setHistoryIndex(-1);
+    lastSerializedRef.current = "";
+    setSelectedElementId(null);
+    setPanOffset({ x: 0, y: 0 });
+    setZoom(1);
+  }, [spaceId]);
+
   // Parse initial canvas data
   useEffect(() => {
-    if (canvasData) {
+    if (canvasData && canvasData !== lastSerializedRef.current) {
       try {
         const parsed = JSON.parse(canvasData);
         if (Array.isArray(parsed)) {
           setElements(parsed);
           setHistory([parsed]);
           setHistoryIndex(0);
+          lastSerializedRef.current = canvasData;
         }
       } catch (e) {
         console.error("Failed to parse canvasData:", e);
@@ -107,7 +247,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
     }
   }, [canvasData]);
 
-  // Canvas Resize Handler
+  // Canvas Resize Handler (Only triggers on window resizing or mounting)
   useEffect(() => {
     const handleResize = () => {
       const canvas = canvasRef.current;
@@ -122,7 +262,42 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [elements, activeElement, textInput]);
+  }, []);
+
+  // Sync canvas redraw loop with elements & state configurations
+  useEffect(() => {
+    drawCanvas();
+  }, [elements, activeElement, textInput, panOffset, zoom, selectedElementId]);
+
+  // Keyboard shortcut listener to delete selected element
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedElementId) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        const updated = elements.filter((el) => el.id !== selectedElementId);
+        updateElementsState(updated);
+        setSelectedElementId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedElementId, elements]);
+
+  // Sync selection styles back to toolbar controls
+  useEffect(() => {
+    if (selectedElementId) {
+      const el = elements.find((e) => e.id === selectedElementId);
+      if (el) {
+        setStrokeColor(el.stroke);
+        setFillColor(el.fill);
+        setStrokeWidth(el.strokeWidth);
+      }
+    }
+  }, [selectedElementId]);
 
   // Main Canvas Rendering Loop
   const drawCanvas = () => {
@@ -133,30 +308,62 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Grid Background for a nice Excalidraw aesthetic
+    ctx.save();
+    
+    // Panning & Zoom scaling
+    ctx.translate(panOffset.x, panOffset.y);
+    ctx.scale(zoom, zoom);
+
+    // Draw Grid Background for a nice Excalidraw aesthetic (scrolls dynamically with pan)
     ctx.strokeStyle = "var(--border)";
-    ctx.lineWidth = 0.5;
+    ctx.lineWidth = 0.5 / zoom; // Maintain sharp grid lines at all zoom steps
     const gridSize = 30;
-    for (let x = 0; x < canvas.width; x += gridSize) {
+
+    const left = -panOffset.x / zoom;
+    const right = (canvas.width - panOffset.x) / zoom;
+    const top = -panOffset.y / zoom;
+    const bottom = (canvas.height - panOffset.y) / zoom;
+
+    const startX = Math.floor(left / gridSize) * gridSize;
+    const startY = Math.floor(top / gridSize) * gridSize;
+
+    for (let x = startX; x < right; x += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
       ctx.stroke();
     }
-    for (let y = 0; y < canvas.height; y += gridSize) {
+    for (let y = startY; y < bottom; y += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
+      ctx.moveTo(left, y);
+      ctx.lineTo(right, y);
       ctx.stroke();
     }
 
-    // Render all elements in state
+    // Render all committed elements
     elements.forEach((el) => renderElement(ctx, el));
 
-    // Render currently active temporary element
+    // Render selection indicator dashed frame
+    if (selectedElementId) {
+      const selectedEl = elements.find((el) => el.id === selectedElementId);
+      if (selectedEl) {
+        const bounds = getElementBounds(selectedEl);
+        ctx.strokeStyle = "#3b82f6"; // selection blue
+        ctx.lineWidth = 1 / zoom; // Maintain uniform selection bounds outline
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
+        ctx.beginPath();
+        ctx.rect(bounds.x - 5, bounds.y - 5, bounds.width + 10, bounds.height + 10);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Render active temporary drawing element
     if (activeElement) {
       renderElement(ctx, activeElement);
     }
+
+    ctx.restore();
   };
 
   // Render Individual Element on Canvas
@@ -248,27 +455,52 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
     }
   };
 
-  // Trigger draw on elements changes
-  useEffect(() => {
-    drawCanvas();
-  }, [elements, activeElement]);
-
-  // Relative coordinate calculator
+  // Relative coordinate calculator (Accounts for Zoom and Pan offsets)
   const getMouseCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: (e.clientX - rect.left - panOffset.x) / zoom,
+      y: (e.clientY - rect.top - panOffset.y) / zoom,
     };
   };
 
   // Mouse Down Event Handler
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (tool === "pointer") return;
+    // Middle-click (1) or Space Key or Hand tool triggers panning
+    if (e.button === 1 || tool === "hand") {
+      isPanning.current = true;
+      panStart.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+      return;
+    }
 
     const { x, y } = getMouseCoords(e);
+
+    // Pointer tool -> selection and dragging
+    if (tool === "pointer") {
+      const clickedEl = getElementAtPosition(x, y, elements);
+      if (clickedEl) {
+        setSelectedElementId(clickedEl.id);
+        setIsDraggingElement(true);
+        dragStartMouse.current = { x, y };
+        dragStartElement.current = { ...clickedEl }; // deep copy properties
+      } else {
+        setSelectedElementId(null);
+      }
+      return;
+    }
+
+    // Eraser tool -> Click to erase immediately
+    if (tool === "eraser") {
+      setIsDrawing(true);
+      const clickedEl = getElementAtPosition(x, y, elements);
+      if (clickedEl) {
+        const updated = elements.filter((el) => el.id !== clickedEl.id);
+        setElements(updated);
+      }
+      return;
+    }
 
     if (tool === "text") {
       setTextInput({ x, y, text: "" });
@@ -295,9 +527,53 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
 
   // Mouse Move Event Handler
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !activeElement) return;
+    if (isPanning.current) {
+      setPanOffset({
+        x: e.clientX - panStart.current.x,
+        y: e.clientY - panStart.current.y,
+      });
+      return;
+    }
 
     const { x, y } = getMouseCoords(e);
+
+    // Drag-move elements under Selection Pointer
+    if (tool === "pointer" && isDraggingElement && dragStartElement.current && dragStartMouse.current) {
+      const dx = x - dragStartMouse.current.x;
+      const dy = y - dragStartMouse.current.y;
+      const startEl = dragStartElement.current;
+
+      let movedElement: CanvasElement;
+      if (startEl.type === "pencil" && startEl.points) {
+        movedElement = {
+          ...startEl,
+          x: startEl.x + dx,
+          y: startEl.y + dy,
+          points: startEl.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+        };
+      } else {
+        movedElement = {
+          ...startEl,
+          x: startEl.x + dx,
+          y: startEl.y + dy,
+        };
+      }
+
+      setElements((prev) => prev.map((el) => (el.id === startEl.id ? movedElement : el)));
+      return;
+    }
+
+    // Drag-erase elements under Eraser tool
+    if (tool === "eraser" && isDrawing) {
+      const hoveredEl = getElementAtPosition(x, y, elements);
+      if (hoveredEl) {
+        const updated = elements.filter((el) => el.id !== hoveredEl.id);
+        setElements(updated);
+      }
+      return;
+    }
+
+    if (!isDrawing || !activeElement) return;
 
     if (activeElement.type === "pencil") {
       const points = [...(activeElement.points || []), { x, y }];
@@ -316,6 +592,27 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
 
   // Mouse Up Event Handler
   const handleMouseUp = () => {
+    if (isPanning.current) {
+      isPanning.current = false;
+      return;
+    }
+
+    // Selection move completes
+    if (tool === "pointer" && isDraggingElement) {
+      setIsDraggingElement(false);
+      dragStartMouse.current = null;
+      dragStartElement.current = null;
+      updateElementsState(elements);
+      return;
+    }
+
+    // Eraser sweeps completes
+    if (tool === "eraser" && isDrawing) {
+      setIsDrawing(false);
+      updateElementsState(elements);
+      return;
+    }
+
     if (!isDrawing || !activeElement) return;
     setIsDrawing(false);
 
@@ -337,7 +634,42 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
     const newHistory = history.slice(0, historyIndex + 1);
     setHistory([...newHistory, newElements]);
     setHistoryIndex(newHistory.length);
-    onChange(JSON.stringify(newElements));
+    const serialized = JSON.stringify(newElements);
+    lastSerializedRef.current = serialized;
+    onChange(serialized);
+  };
+
+  // Modify Selected element stroke/fill style properties directly
+  const changeSelectedElementProperty = (property: "stroke" | "fill" | "strokeWidth", value: any) => {
+    if (!selectedElementId) return;
+    const updated = elements.map((el) => {
+      if (el.id === selectedElementId) {
+        return { ...el, [property]: value };
+      }
+      return el;
+    });
+    updateElementsState(updated);
+  };
+
+  const handleStrokeColorChange = (color: string) => {
+    setStrokeColor(color);
+    if (selectedElementId) {
+      changeSelectedElementProperty("stroke", color);
+    }
+  };
+
+  const handleFillColorChange = (color: string) => {
+    setFillColor(color);
+    if (selectedElementId) {
+      changeSelectedElementProperty("fill", color);
+    }
+  };
+
+  const handleStrokeWidthChange = (width: number) => {
+    setStrokeWidth(width);
+    if (selectedElementId) {
+      changeSelectedElementProperty("strokeWidth", width);
+    }
   };
 
   // Handle Text Submission
@@ -370,7 +702,10 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
       const prevIndex = historyIndex - 1;
       setHistoryIndex(prevIndex);
       setElements(history[prevIndex]);
-      onChange(JSON.stringify(history[prevIndex]));
+      setSelectedElementId(null);
+      const serialized = JSON.stringify(history[prevIndex]);
+      lastSerializedRef.current = serialized;
+      onChange(serialized);
     }
   };
 
@@ -380,7 +715,10 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
       const nextIndex = historyIndex + 1;
       setHistoryIndex(nextIndex);
       setElements(history[nextIndex]);
-      onChange(JSON.stringify(history[nextIndex]));
+      setSelectedElementId(null);
+      const serialized = JSON.stringify(history[nextIndex]);
+      lastSerializedRef.current = serialized;
+      onChange(serialized);
     }
   };
 
@@ -388,6 +726,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
   const handleClear = () => {
     const confirm = window.confirm("Are you sure you want to clear the whiteboard?");
     if (confirm) {
+      setSelectedElementId(null);
       updateElementsState([]);
     }
   };
@@ -396,7 +735,6 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
   const handleSendInvite = (recipientId: string, recipientName: string) => {
     if (!currentUser) return;
 
-    // Send a message pinging this space
     const inviteMessage = `Hey ${recipientName}! I've set up a Whiteboard for us. Click the space reference to join and collaborate!`;
     const spacePing = {
       type: "space" as const,
@@ -431,13 +769,16 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
               "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
               tool === "pointer" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
             )}
-            title="Selector (Pointer)"
+            title="Selector (Pointer) - Click to select & move elements"
           >
             <MousePointer size={14} />
           </button>
           <button
             type="button"
-            onClick={() => setTool("pencil")}
+            onClick={() => {
+              setTool("pencil");
+              setSelectedElementId(null);
+            }}
             className={cn(
               "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
               tool === "pencil" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
@@ -448,7 +789,10 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           </button>
           <button
             type="button"
-            onClick={() => setTool("rectangle")}
+            onClick={() => {
+              setTool("rectangle");
+              setSelectedElementId(null);
+            }}
             className={cn(
               "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
               tool === "rectangle" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
@@ -459,7 +803,10 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           </button>
           <button
             type="button"
-            onClick={() => setTool("ellipse")}
+            onClick={() => {
+              setTool("ellipse");
+              setSelectedElementId(null);
+            }}
             className={cn(
               "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
               tool === "ellipse" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
@@ -470,7 +817,10 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           </button>
           <button
             type="button"
-            onClick={() => setTool("line")}
+            onClick={() => {
+              setTool("line");
+              setSelectedElementId(null);
+            }}
             className={cn(
               "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
               tool === "line" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
@@ -481,7 +831,10 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           </button>
           <button
             type="button"
-            onClick={() => setTool("arrow")}
+            onClick={() => {
+              setTool("arrow");
+              setSelectedElementId(null);
+            }}
             className={cn(
               "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
               tool === "arrow" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
@@ -492,7 +845,10 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           </button>
           <button
             type="button"
-            onClick={() => setTool("text")}
+            onClick={() => {
+              setTool("text");
+              setSelectedElementId(null);
+            }}
             className={cn(
               "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
               tool === "text" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
@@ -500,6 +856,34 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
             title="Text Tool"
           >
             <Type size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTool("eraser");
+              setSelectedElementId(null);
+            }}
+            className={cn(
+              "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
+              tool === "eraser" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
+            )}
+            title="Eraser (Erase drawings)"
+          >
+            <Eraser size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTool("hand");
+              setSelectedElementId(null);
+            }}
+            className={cn(
+              "p-2 rounded-lg transition-colors hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] cursor-pointer",
+              tool === "hand" && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]"
+            )}
+            title="Hand (Pan Canvas)"
+          >
+            <Hand size={14} />
           </button>
         </div>
 
@@ -512,7 +896,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
               <button
                 key={sc.hex}
                 type="button"
-                onClick={() => setStrokeColor(sc.hex)}
+                onClick={() => handleStrokeColorChange(sc.hex)}
                 style={{ backgroundColor: sc.hex }}
                 className={cn(
                   "w-4 h-4 rounded-full border border-black/10 flex items-center justify-center cursor-pointer transition-all hover:scale-110",
@@ -532,7 +916,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
               <button
                 key={fc.hex}
                 type="button"
-                onClick={() => setFillColor(fc.hex)}
+                onClick={() => handleFillColorChange(fc.hex)}
                 style={{ backgroundColor: fc.hex === "transparent" ? "transparent" : fc.hex }}
                 className={cn(
                   "w-4 h-4 rounded-full border border-dashed flex items-center justify-center cursor-pointer transition-all hover:scale-110",
@@ -553,7 +937,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
               <button
                 key={w}
                 type="button"
-                onClick={() => setStrokeWidth(w)}
+                onClick={() => handleStrokeWidthChange(w)}
                 className={cn(
                   "px-1.5 py-0.5 rounded cursor-pointer hover:bg-[var(--background-muted)] font-mono",
                   strokeWidth === w && "bg-[var(--primary-subtle)] text-[var(--primary)] font-bold"
@@ -565,8 +949,54 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           </div>
         </div>
 
-        {/* History & Collaborators Actions */}
-        <div className="flex items-center gap-1.5">
+        {/* History & Zoom & Collaborators Actions */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1 bg-[var(--background)] p-1 rounded-xl border border-[var(--border)] text-[12px] text-[var(--foreground-muted)]">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(0.2, Number((z - 0.1).toFixed(1))))}
+              className="p-1.5 rounded hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)]"
+              title="Zoom Out"
+            >
+              <ZoomOut size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              className="px-1.5 py-0.5 rounded hover:bg-[var(--background-muted)] font-mono font-bold text-[10px] cursor-pointer"
+              title="Reset Zoom to 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(3, Number((z + 0.1).toFixed(1))))}
+              className="p-1.5 rounded hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)]"
+              title="Zoom In"
+            >
+              <ZoomIn size={13} />
+            </button>
+          </div>
+
+          <span className="w-[1px] h-6 bg-[var(--border)] mx-1" />
+
+          {/* Delete Selection Action */}
+          {selectedElementId && (
+            <button
+              type="button"
+              onClick={() => {
+                const updated = elements.filter((el) => el.id !== selectedElementId);
+                updateElementsState(updated);
+                setSelectedElementId(null);
+              }}
+              className="p-2 rounded-xl border border-red-200 hover:bg-red-50 hover:text-red-600 text-red-500 cursor-pointer bg-[var(--background)]"
+              title="Delete selected element"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleUndo}
@@ -648,6 +1078,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
           className="block select-none cursor-crosshair"
         />
 
@@ -657,8 +1088,8 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
             onSubmit={handleTextSubmit}
             style={{
               position: "absolute",
-              left: `${textInput.x}px`,
-              top: `${textInput.y - 12}px`,
+              left: `${textInput.x * zoom + panOffset.x}px`,
+              top: `${(textInput.y - 12) * zoom + panOffset.y}px`,
             }}
             className="z-40 p-1 bg-[var(--card)] border border-[var(--primary)] rounded-lg shadow-xl"
           >
@@ -682,7 +1113,7 @@ export function WhiteboardCanvas({ canvasData, onChange, spaceId, spaceName }: W
           <span className="capitalize px-1.5 py-0.2 rounded bg-[var(--background-muted)] text-[var(--foreground-muted)] border border-[var(--border)]">{tool}</span>
         </div>
         <div>
-          <span>Click and drag to draw. Double-click or select Text Tool to type.</span>
+          <span>Click and drag to draw. Pointer tool: click to select, drag to move. Delete / Backspace: remove shape. Hand tool: drag canvas.</span>
         </div>
       </div>
     </div>

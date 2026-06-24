@@ -20,31 +20,123 @@ import {
   Bold,
   Italic,
   Underline as UnderlineIcon,
-  Heading1,
-  Heading2,
-  Heading3,
+  Strikethrough,
+  Code,
   AlignLeft,
   AlignCenter,
   AlignRight,
+  AlignJustify,
   List,
   ListOrdered,
-  Quote,
-  Code,
-  Table as TableIcon,
-  Image as ImageIcon,
   CheckSquare,
   Undo2,
   Redo2,
   Link2,
-  Sparkles,
   ChevronDown,
   Trash2,
   Highlighter,
   Plus,
+  Image as ImageIcon,
+  Table as TableIcon,
+  RemoveFormatting,
+  Minus,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Custom Annotation Mark for Notion-style Highlights
+// ── Custom Rich Text TextStyle Mark ──────────────────────────────────
+// Manages FontSize, FontFamily, Color, and BackgroundColor in a single span mark
+const CustomTextStyle = Mark.create({
+  name: "textStyle",
+
+  addAttributes() {
+    return {
+      fontSize: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.fontSize,
+        renderHTML: (attributes: Record<string, any>) => {
+          if (!attributes.fontSize) {
+            return {};
+          }
+          return { style: `font-size: ${attributes.fontSize}` };
+        },
+      },
+      fontFamily: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.fontFamily,
+        renderHTML: (attributes: Record<string, any>) => {
+          if (!attributes.fontFamily) {
+            return {};
+          }
+          return { style: `font-family: ${attributes.fontFamily}` };
+        },
+      },
+      color: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.color,
+        renderHTML: (attributes: Record<string, any>) => {
+          if (!attributes.color) {
+            return {};
+          }
+          return { style: `color: ${attributes.color}` };
+        },
+      },
+      backgroundColor: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.backgroundColor,
+        renderHTML: (attributes: Record<string, any>) => {
+          if (!attributes.backgroundColor) {
+            return {};
+          }
+          return { style: `background-color: ${attributes.backgroundColor}` };
+        },
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: "span",
+        getAttrs: (element: HTMLElement | string) => {
+          if (typeof element === "string") return {};
+          if (
+            element.style.fontSize ||
+            element.style.fontFamily ||
+            element.style.color ||
+            element.style.backgroundColor
+          ) {
+            return {};
+          }
+          return false;
+        },
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, any> }) {
+    const styles: string[] = [];
+    if (HTMLAttributes.fontSize) styles.push(`font-size: ${HTMLAttributes.fontSize}`);
+    if (HTMLAttributes.fontFamily) styles.push(`font-family: ${HTMLAttributes.fontFamily}`);
+    if (HTMLAttributes.color) styles.push(`color: ${HTMLAttributes.color}`);
+    if (HTMLAttributes.backgroundColor) styles.push(`background-color: ${HTMLAttributes.backgroundColor}`);
+
+    if (styles.length === 0) {
+      return ["span", HTMLAttributes, 0];
+    }
+
+    return [
+      "span",
+      {
+        ...HTMLAttributes,
+        style: styles.join("; "),
+      },
+      0,
+    ];
+  },
+});
+
+// Custom Annotation Mark for legacy Notion-style Highlights
 const AnnotationMark = Mark.create({
   name: "annotation",
   addAttributes() {
@@ -106,7 +198,10 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
     query: "",
   });
 
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
   const slashMenuRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -116,6 +211,7 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
         },
       }),
       Underline,
+      CustomTextStyle,
       AnnotationMark,
       Link.configure({
         openOnClick: false,
@@ -180,7 +276,6 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
         const query = match[1];
         try {
           const coords = editor.view.coordsAtPos(selection.from);
-          // Calculate relative offsets to center it nicely
           setSlashMenu((prev) => ({
             isOpen: true,
             x: coords.left,
@@ -229,7 +324,6 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
             event.preventDefault();
             const cmd = filteredCommands[slashMenu.selectedIndex];
             if (cmd) {
-              // Delete the "/" command trigger
               const { selection } = view.state;
               const rangeFrom = selection.from - slashMenu.query.length - 1;
               editor.commands.deleteRange({ from: rangeFrom, to: selection.from });
@@ -256,11 +350,14 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
     }
   }, [content, editor]);
 
-  // Click outside to close slash menu
+  // Click outside to close slash and toolbar dropdowns
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (slashMenuRef.current && !slashMenuRef.current.contains(e.target as Node)) {
         setSlashMenu((prev) => ({ ...prev, isOpen: false }));
+      }
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setActiveDropdown(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -268,6 +365,69 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
   }, []);
 
   if (!editor) return null;
+
+  // Toggle toolbar dropdowns
+  const toggleDropdown = (dropdown: string) => {
+    setActiveDropdown((prev) => (prev === dropdown ? null : dropdown));
+  };
+
+  // Typography Options Configuration
+  const fonts = [
+    { name: "Default (Outfit)", value: "Outfit, sans-serif" },
+    { name: "Inter", value: "Inter, sans-serif" },
+    { name: "Georgia", value: "Georgia, serif" },
+    { name: "Playfair Display", value: "Playfair Display, serif" },
+    { name: "Courier New", value: "Courier New, monospace" },
+    { name: "Comic Sans", value: "Comic Sans MS, cursive" },
+  ];
+
+  const sizes = ["12px", "14px", "16px", "18px", "20px", "24px", "30px", "36px", "48px"];
+
+  const textColors = [
+    { name: "Charcoal", hex: "#1e293b" },
+    { name: "Slate", hex: "#64748b" },
+    { name: "Blue", hex: "#3b82f6" },
+    { name: "Emerald", hex: "#10b981" },
+    { name: "Purple", hex: "#a855f7" },
+    { name: "Rose", hex: "#f43f5e" },
+    { name: "Orange", hex: "#f97316" },
+    { name: "Amber", hex: "#d97706" },
+  ];
+
+  const highlightColors = [
+    { name: "Clear", hex: "transparent" },
+    { name: "Yellow", hex: "rgba(253, 224, 71, 0.4)" },
+    { name: "Green", hex: "rgba(187, 247, 208, 0.4)" },
+    { name: "Blue", hex: "rgba(191, 219, 254, 0.4)" },
+    { name: "Pink", hex: "rgba(251, 207, 232, 0.4)" },
+    { name: "Orange", hex: "rgba(254, 215, 170, 0.4)" },
+  ];
+
+  // Helper Set Commands
+  const setFontFamily = (family: string) => {
+    const attrs = editor.getAttributes("textStyle");
+    editor.chain().focus().setMark("textStyle", { ...attrs, fontFamily: family }).run();
+  };
+
+  const setFontSize = (size: string) => {
+    const attrs = editor.getAttributes("textStyle");
+    editor.chain().focus().setMark("textStyle", { ...attrs, fontSize: size }).run();
+  };
+
+  const setTextColor = (color: string) => {
+    const attrs = editor.getAttributes("textStyle");
+    editor.chain().focus().setMark("textStyle", { ...attrs, color }).run();
+  };
+
+  const setHighlightColor = (bgColor: string) => {
+    const attrs = editor.getAttributes("textStyle");
+    const newBg = bgColor === "transparent" ? null : bgColor;
+    editor.chain().focus().setMark("textStyle", { ...attrs, backgroundColor: newBg }).run();
+  };
+
+  const clearFormatting = () => {
+    editor.chain().focus().unsetAllMarks().unsetMark("textStyle").run();
+  };
 
   const addImage = (urlStr?: string) => {
     const url = urlStr || window.prompt("Enter image URL:");
@@ -286,32 +446,35 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   };
 
-  const setAnnotationColor = (color: string) => {
-    if (color === "clear") {
-      editor.chain().focus().unsetMark("annotation").run();
-    } else {
-      editor.chain().focus().setMark("annotation", { color }).run();
-    }
-  };
+  // Get current active styling attributes for display
+  const textStyleAttrs = editor.getAttributes("textStyle");
+  const activeFont = textStyleAttrs.fontFamily || "Outfit, sans-serif";
+  const activeSize = textStyleAttrs.fontSize || "14px";
+  const activeColor = textStyleAttrs.color || "#1e293b";
+  const activeBgColor = textStyleAttrs.backgroundColor || "transparent";
+
+  // Find readable font display name
+  const currentFontObj = fonts.find((f) => activeFont.startsWith(f.value.split(",")[0])) || fonts[0];
+  const currentFontName = currentFontObj.name.replace("Default (", "").replace(")", "");
 
   // Define Slash Commands List
   const slashCommands: SlashCommandItem[] = [
     {
       title: "Heading 1",
       description: "Big section heading",
-      icon: Heading1,
+      icon: Heading1Icon,
       action: (ed) => ed.chain().focus().toggleHeading({ level: 1 }).run(),
     },
     {
       title: "Heading 2",
       description: "Medium section heading",
-      icon: Heading2,
+      icon: Heading2Icon,
       action: (ed) => ed.chain().focus().toggleHeading({ level: 2 }).run(),
     },
     {
       title: "Heading 3",
       description: "Small section heading",
-      icon: Heading3,
+      icon: Heading3Icon,
       action: (ed) => ed.chain().focus().toggleHeading({ level: 3 }).run(),
     },
     {
@@ -335,7 +498,7 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
     {
       title: "Quote",
       description: "Large blockquote block",
-      icon: Quote,
+      icon: QuoteIcon,
       action: (ed) => ed.chain().focus().toggleBlockquote().run(),
     },
     {
@@ -364,20 +527,25 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
     },
   ];
 
+  // Helper icons for slash command definitions
+  function Heading1Icon({ size, className }: { size?: number; className?: string }) {
+    return <div className={cn("text-[11px] font-extrabold select-none", className)}>H1</div>;
+  }
+  function Heading2Icon({ size, className }: { size?: number; className?: string }) {
+    return <div className={cn("text-[11px] font-extrabold select-none", className)}>H2</div>;
+  }
+  function Heading3Icon({ size, className }: { size?: number; className?: string }) {
+    return <div className={cn("text-[11px] font-extrabold select-none", className)}>H3</div>;
+  }
+  function QuoteIcon({ size, className }: { size?: number; className?: string }) {
+    return <div className={cn("text-[14px] font-serif italic font-bold select-none", className)}>“</div>;
+  }
+
   const filteredCommands = slashCommands.filter((cmd) =>
     cmd.title.toLowerCase().includes(slashMenu.query.toLowerCase())
   );
 
   const isTableActive = editor.isActive("table");
-
-  // Highlight colors configuration
-  const HIGHLIGHT_COLORS = [
-    { name: "Yellow", color: "#fef08a" },
-    { name: "Green", color: "#bbf7d0" },
-    { name: "Blue", color: "#bfdbfe" },
-    { name: "Pink", color: "#fbcfe8" },
-    { name: "Clear", color: "clear" },
-  ];
 
   return (
     <div className="relative w-full">
@@ -422,6 +590,17 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
           </button>
           <button
             type="button"
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            className={cn(
+              "p-1.5 rounded-lg hover:bg-[var(--background-subtle)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer",
+              editor.isActive("strike") && "text-[var(--primary)] bg-[var(--background-muted)]"
+            )}
+            title="Strike-through"
+          >
+            <Strikethrough size={13} />
+          </button>
+          <button
+            type="button"
             onClick={() => editor.chain().focus().toggleCode().run()}
             className={cn(
               "p-1.5 rounded-lg hover:bg-[var(--background-subtle)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer",
@@ -451,18 +630,18 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
 
           {/* Highlight Color Pickers */}
           <div className="flex items-center gap-1 px-1">
-            {HIGHLIGHT_COLORS.map((hc) => (
+            {highlightColors.map((hc) => (
               <button
                 key={hc.name}
                 type="button"
-                onClick={() => setAnnotationColor(hc.color)}
+                onClick={() => setHighlightColor(hc.hex)}
                 style={{
-                  backgroundColor: hc.color === "clear" ? "transparent" : hc.color,
-                  borderColor: hc.color === "clear" ? "var(--border)" : "transparent",
+                  backgroundColor: hc.hex === "transparent" ? "transparent" : hc.hex,
+                  borderColor: hc.hex === "transparent" ? "var(--border)" : "transparent",
                 }}
                 className={cn(
                   "w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-all text-[8px] font-bold text-slate-700",
-                  hc.color === "clear" && "border-[var(--border)]"
+                  hc.hex === "transparent" && "border-[var(--border)]"
                 )}
                 title={hc.name === "Clear" ? "Clear highlight" : `${hc.name} highlight`}
               >
@@ -525,34 +704,274 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
 
       {/* Editor Main Container (Distraction-Free Styling) */}
       <div className="bg-transparent prose-headings:font-bold prose-p:text-[var(--foreground-muted)]">
-        {/* Sub-toolbar for standard controls like Undo/Redo & Alignments */}
-        <div className="flex items-center justify-between gap-1 py-1.5 px-3 border-b border-[var(--border)] bg-[var(--background-subtle)]/30 rounded-xl mb-4 text-[12px]">
-          <div className="flex items-center gap-1.5">
+        
+        {/* Word-style Top Toolbar */}
+        <div ref={toolbarRef} className="relative z-30 flex flex-wrap items-center gap-1 p-2 bg-[var(--background-subtle)]/70 border border-[var(--border)] rounded-xl mb-4 text-[12px] select-none">
+          
+          {/* History Group */}
+          <div className="flex items-center gap-0.5">
             <button
+              key="undo-btn"
               type="button"
               onClick={() => editor.chain().focus().undo().run()}
               disabled={!editor.can().undo()}
-              className="p-1 rounded hover:bg-[var(--background-muted)] disabled:opacity-40 text-[var(--foreground-subtle)] cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-[var(--background-muted)] disabled:opacity-40 text-[var(--foreground-muted)] hover:text-[var(--foreground)] cursor-pointer"
               title="Undo"
             >
               <Undo2 size={13} />
             </button>
             <button
+              key="redo-btn"
               type="button"
               onClick={() => editor.chain().focus().redo().run()}
               disabled={!editor.can().redo()}
-              className="p-1 rounded hover:bg-[var(--background-muted)] disabled:opacity-40 text-[var(--foreground-subtle)] cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-[var(--background-muted)] disabled:opacity-40 text-[var(--foreground-muted)] hover:text-[var(--foreground)] cursor-pointer"
               title="Redo"
             >
               <Redo2 size={13} />
             </button>
-            
-            <span className="w-[1px] h-3.5 bg-[var(--border)] mx-1" />
+          </div>
 
+          <span className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+          {/* Font & Size Dropdowns */}
+          <div className="flex items-center gap-1">
+            {/* Font Family Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown("font")}
+                className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--background-subtle)] text-[12px] font-semibold text-[var(--foreground-muted)] bg-[var(--card)] cursor-pointer min-w-[120px] text-left"
+              >
+                <span className="truncate">{currentFontName}</span>
+                <ChevronDown size={11} className="opacity-60 flex-shrink-0" />
+              </button>
+
+              {activeDropdown === "font" && (
+                <div className="absolute left-0 top-[calc(100%+4px)] w-[180px] max-h-[250px] overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl p-1 z-40 flex flex-col gap-0.5 animate-scale-in">
+                  {fonts.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => {
+                        setFontFamily(f.value);
+                        setActiveDropdown(null);
+                      }}
+                      style={{ fontFamily: f.value }}
+                      className={cn(
+                        "w-full px-2.5 py-1.5 text-left rounded-lg text-[13px] hover:bg-[var(--background-subtle)] cursor-pointer transition-colors",
+                        activeFont.startsWith(f.value.split(",")[0])
+                          ? "bg-[var(--primary-subtle)] text-[var(--primary)] font-bold"
+                          : "text-[var(--foreground-muted)]"
+                      )}
+                    >
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Font Size Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown("size")}
+                className="flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--background-subtle)] text-[12px] font-semibold text-[var(--foreground-muted)] bg-[var(--card)] cursor-pointer min-w-[60px] text-left"
+              >
+                <span>{activeSize}</span>
+                <ChevronDown size={11} className="opacity-60 flex-shrink-0" />
+              </button>
+
+              {activeDropdown === "size" && (
+                <div className="absolute left-0 top-[calc(100%+4px)] w-[80px] max-h-[250px] overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl p-1 z-40 flex flex-col gap-0.5 animate-scale-in">
+                  {sizes.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setFontSize(s);
+                        setActiveDropdown(null);
+                      }}
+                      className={cn(
+                        "w-full px-2.5 py-1 text-center rounded-lg text-[13px] hover:bg-[var(--background-subtle)] cursor-pointer font-mono transition-colors",
+                        activeSize === s
+                          ? "bg-[var(--primary-subtle)] text-[var(--primary)] font-bold"
+                          : "text-[var(--foreground-muted)]"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <span className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+          {/* Typography Styles Group */}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer",
+                editor.isActive("bold") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Bold"
+            >
+              <Bold size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer",
+                editor.isActive("italic") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Italic"
+            >
+              <Italic size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer",
+                editor.isActive("underline") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Underline"
+            >
+              <UnderlineIcon size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer",
+                editor.isActive("strike") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Strike-through"
+            >
+              <Strikethrough size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleCode().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer",
+                editor.isActive("code") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Inline Code"
+            >
+              <Code size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={clearFormatting}
+              className="p-1.5 rounded-lg hover:bg-[var(--background-muted)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+              title="Clear Formatting"
+            >
+              <RemoveFormatting size={13} />
+            </button>
+          </div>
+
+          <span className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+          {/* Color pickers Group */}
+          <div className="flex items-center gap-1">
+            {/* Text Color Picker */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown("color")}
+                className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-[var(--background-subtle)] border border-[var(--border)] text-[var(--foreground-muted)] bg-[var(--card)] cursor-pointer"
+                title="Text Color"
+              >
+                <div className="flex flex-col items-center justify-center leading-none">
+                  <span className="font-bold text-[12px] font-serif">A</span>
+                  <div style={{ backgroundColor: activeColor }} className="w-3.5 h-0.5 mt-0.5 rounded-full" />
+                </div>
+                <ChevronDown size={8} className="opacity-60 flex-shrink-0" />
+              </button>
+
+              {activeDropdown === "color" && (
+                <div className="absolute left-0 top-[calc(100%+4px)] w-[120px] bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl p-1.5 z-40 grid grid-cols-4 gap-1 animate-scale-in">
+                  {textColors.map((tc) => (
+                    <button
+                      key={tc.hex}
+                      type="button"
+                      onClick={() => {
+                        setTextColor(tc.hex);
+                        setActiveDropdown(null);
+                      }}
+                      style={{ backgroundColor: tc.hex }}
+                      className={cn(
+                        "w-5 h-5 rounded-md border border-black/10 cursor-pointer transition-transform hover:scale-115 flex items-center justify-center",
+                        activeColor === tc.hex && "ring-2 ring-[var(--primary)] ring-offset-1"
+                      )}
+                      title={tc.name}
+                    >
+                      {activeColor === tc.hex && <Check size={8} className="text-white mix-blend-difference" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Highlight Color Picker */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown("highlight")}
+                className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-[var(--background-subtle)] border border-[var(--border)] text-[var(--foreground-muted)] bg-[var(--card)] cursor-pointer"
+                title="Highlight Color"
+              >
+                <div className="flex flex-col items-center justify-center leading-none relative">
+                  <Highlighter size={13} className="text-[var(--foreground-muted)]" />
+                  <div style={{ backgroundColor: activeBgColor === "transparent" ? "var(--border)" : activeBgColor }} className="w-3.5 h-0.5 mt-0.5 rounded-full absolute bottom-[-4px]" />
+                </div>
+                <ChevronDown size={8} className="opacity-60 flex-shrink-0 ml-1.5" />
+              </button>
+
+              {activeDropdown === "highlight" && (
+                <div className="absolute left-0 top-[calc(100%+4px)] w-[120px] bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl p-1.5 z-40 grid grid-cols-3 gap-1 animate-scale-in">
+                  {highlightColors.map((hc) => (
+                    <button
+                      key={hc.name}
+                      type="button"
+                      onClick={() => {
+                        setHighlightColor(hc.hex);
+                        setActiveDropdown(null);
+                      }}
+                      style={{ backgroundColor: hc.hex === "transparent" ? "transparent" : hc.hex }}
+                      className={cn(
+                        "w-6 h-6 rounded-md border flex items-center justify-center cursor-pointer transition-transform hover:scale-115 text-[9px] font-bold text-slate-700",
+                        hc.hex === "transparent" && "border-slate-300 bg-linear-to-tr from-transparent via-red-300 to-transparent",
+                        activeBgColor === hc.hex && "ring-2 ring-[var(--primary)] ring-offset-1"
+                      )}
+                      title={hc.name}
+                    >
+                      {hc.name === "Clear" ? "×" : activeBgColor === hc.hex && <Check size={8} className="text-slate-800 mix-blend-difference" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <span className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+          {/* Alignments Group */}
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
               onClick={() => editor.chain().focus().setTextAlign("left").run()}
-              className={cn("p-1 rounded hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-subtle)]", editor.isActive({ textAlign: "left" }) && "text-[var(--primary)] bg-[var(--background-muted)]")}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive({ textAlign: "left" }) && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
               title="Align Left"
             >
               <AlignLeft size={13} />
@@ -560,7 +979,10 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
             <button
               type="button"
               onClick={() => editor.chain().focus().setTextAlign("center").run()}
-              className={cn("p-1 rounded hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-subtle)]", editor.isActive({ textAlign: "center" }) && "text-[var(--primary)] bg-[var(--background-muted)]")}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive({ textAlign: "center" }) && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
               title="Align Center"
             >
               <AlignCenter size={13} />
@@ -568,23 +990,117 @@ export function TipTapEditor({ content, onChange, placeholder = "Type '/' for co
             <button
               type="button"
               onClick={() => editor.chain().focus().setTextAlign("right").run()}
-              className={cn("p-1 rounded hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-subtle)]", editor.isActive({ textAlign: "right" }) && "text-[var(--primary)] bg-[var(--background-muted)]")}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive({ textAlign: "right" }) && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
               title="Align Right"
             >
               <AlignRight size={13} />
             </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive({ textAlign: "justify" }) && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Justify Alignment"
+            >
+              <AlignJustify size={13} />
+            </button>
           </div>
 
-          <div className="flex items-center gap-1">
+          <span className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+          {/* Lists Group */}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive("bulletList") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Bullet List"
+            >
+              <List size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive("orderedList") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Numbered List"
+            >
+              <ListOrdered size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleTaskList().run()}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive("taskList") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Task Checklist"
+            >
+              <CheckSquare size={13} />
+            </button>
+          </div>
+
+          <span className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+          {/* Insertions Group */}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={addLink}
+              className={cn(
+                "p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
+                editor.isActive("link") && "text-[var(--primary)] bg-[var(--background-muted)]"
+              )}
+              title="Insert Link"
+            >
+              <Link2 size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => addImage()}
+              className="p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              title="Embed Image"
+            >
+              <ImageIcon size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+              className="p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              title="Insert Table"
+            >
+              <TableIcon size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
+              className="p-1.5 rounded-lg hover:bg-[var(--background-muted)] cursor-pointer text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              title="Insert Horizontal Line"
+            >
+              <Minus size={13} />
+            </button>
+          </div>
+          
+          <div className="ml-auto flex items-center gap-1.5">
             <span className="text-[10px] text-[var(--foreground-subtle)] italic select-none">
-              Type <strong className="font-bold">/</strong> for blocks
+              Type <strong className="font-bold">/</strong> for commands
             </span>
           </div>
         </div>
 
         {/* Table Operations context toolbar */}
         {isTableActive && (
-          <div className="flex items-center gap-2 px-3 py-1.5 border border-dashed border-[var(--primary-subtle)] rounded-xl bg-indigo-50/10 dark:bg-indigo-950/10 text-[11px] text-[var(--primary)] mb-3 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 border border-dashed border-[var(--primary-subtle)] rounded-xl bg-indigo-50/10 dark:bg-indigo-950/10 text-[11px] text-[var(--primary)] mb-3 flex-wrap animate-scale-in">
             <span className="font-bold uppercase tracking-wider text-[9px] bg-[var(--primary-subtle)] px-1 rounded">Table</span>
             <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="hover:underline cursor-pointer">+ Col L</button>
             <span>|</span>
